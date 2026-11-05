@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mis Pasajes y Órdenes - BusDrex{% endblock %}
+
+{% block content %}
+<div class="section-container">
+    <div class="section-header">
+        <h2>Mis Pasajes y Órdenes de Compra</h2>
+    </div>
+
+    <!-- Pestañas de Navegación -->
+    <div style="display: flex; gap: 12px; margin-bottom: 24px; border-bottom: 2px solid #e2e8f0; padding-bottom: 1px;">
+        <button id="tabBoletosBtn" class="btn-select-service" style="border-radius: 8px 8px 0 0;" onclick="switchTab('boletos')">
+            🎟️ Mis Boletos Emitidos
+        </button>
+        <button id="tabOrdenesBtn" class="btn-login" style="border-radius: 8px 8px 0 0; background: white;" onclick="switchTab('ordenes')">
+            📑 Mis Órdenes de Compra
+        </button>
+    </div>
+
+    <!-- Contenido Pestaña 1: Boletos Emitidos -->
+    <div id="tabBoletosContent">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="font-size: 0.95rem; color: #64748b;">
+                Filtro por estado:
+                <select id="filtroBoletoEstado" class="form-control" style="display: inline-block; width: auto; padding: 6px 12px;" onchange="loadBoletos()">
+                    <option value="">Todos los boletos</option>
+                    <option value="VALIDO">Solo Válidos</option>
+                    <option value="ANULADO">Solo Anulados</option>
+                </select>
+            </div>
+            <span id="boletosCountText" style="font-weight: 700; color: #0066cc;"></span>
+        </div>
+
+        <div id="boletosContainer" style="display: flex; flex-direction: column; gap: 16px;">
+            <div style="text-align: center; padding: 40px; background: white; border-radius: 8px;">
+                Cargando sus pasajes emitidos...
+            </div>
+        </div>
+    </div>
+
+    <!-- Contenido Pestaña 2: Órdenes de Compra -->
+    <div id="tabOrdenesContent" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="font-size: 0.95rem; color: #64748b;">
+                Filtro por estado de orden:
+                <select id="filtroOrdenEstado" class="form-control" style="display: inline-block; width: auto; padding: 6px 12px;" onchange="loadOrdenes()">
+                    <option value="">Todos los estados</option>
+                    <option value="PENDIENTE">Pendientes</option>
+                    <option value="PAGADO">Pagadas</option>
+                    <option value="ENTREGADO">Entregadas</option>
+                    <option value="CANCELADO">Canceladas</option>
+                </select>
+            </div>
+            <span id="ordenesCountText" style="font-weight: 700; color: #0066cc;"></span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>N° Orden</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Monto Total</th>
+                        <th>Pasajes</th>
+                        <th style="text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="ordenesTableBody">
+                    <!-- Se llena con JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function switchTab(tab) {
+        const boletosTab = document.getElementById('tabBoletosContent');
+        const ordenesTab = document.getElementById('tabOrdenesContent');
+        const boletosBtn = document.getElementById('tabBoletosBtn');
+        const ordenesBtn = document.getElementById('tabOrdenesBtn');
+
+        if (tab === 'boletos') {
+            boletosTab.style.display = 'block';
+            ordenesTab.style.display = 'none';
+            boletosBtn.className = 'btn-select-service';
+            ordenesBtn.className = 'btn-login';
+            loadBoletos();
+        } else {
+            boletosTab.style.display = 'none';
+            ordenesTab.style.display = 'block';
+            boletosBtn.className = 'btn-login';
+            ordenesBtn.className = 'btn-select-service';
+            loadOrdenes();
+        }
+    }
+
+    async function loadBoletos() {
+        if (!BusdrexAPI.getAccessToken()) {
+            window.location.href = `/login/?next=${encodeURIComponent(window.location.pathname)}`;
+            return;
+        }
+
+        const container = document.getElementById('boletosContainer');
+        const countText = document.getElementById('boletosCountText');
+        const estadoFiltro = document.getElementById('filtroBoletoEstado').value;
+
+        const params = new URLSearchParams();
+        if (estadoFiltro) params.append('estado', estadoFiltro);
+
+        try {
+            const res = await BusdrexAPI.authFetch(`/api/mis-boletos/?${params.toString()}`);
+            if (!res.ok) throw new Error('Error al cargar boletos.');
+
+            const data = await res.json();
+            const boletos = data.results || data;
+
+            countText.textContent = `${boletos.length} boletos encontrados`;
+
+            if (!boletos || boletos.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 50px 20px; background: white; border-radius: 8px;">
+                        <h3 style="color: #64748b; margin-bottom: 8px;">No tienes boletos emitidos</h3>
+                        <p style="color: #94a3b8; font-size: 0.9rem;">Cuando compres un pasaje y se confirme el pago, tu boleto aparecerá aquí.</p>
+                        <a href="/buscar/" class="btn-register" style="display: inline-block; margin-top: 15px;">Buscar Pasajes</a>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = boletos.map(b => {
+                const fechaObj = new Date(b.fecha_hora_salida);
+                const fechaStr = fechaObj.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+                const horaStr = fechaObj.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+                const esValido = b.estado === 'VALIDO';
+
+                return `
+                    <div class="bus-diagram-card" style="border-left: 6px solid ${esValido ? '#16a34a' : '#e62629'};">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                            <div>
+                                <h3 style="font-size: 1.25rem; font-weight: 800; color: #00264d;">
+                                    ${b.origen} ➔ ${b.destino}
+                                </h3>
+                                <div style="font-size: 0.85rem; color: #64748b; margin-top: 2px;">
+                                    Terminal: ${b.terminal_origen} | Salida: <strong>${fechaStr} a las ${horaStr} hrs</strong>
+                                </div>
+                            </div>
+                            <span class="badge ${esValido ? 'badge-valido' : 'badge-anulado'}">
+                                ${b.estado_display || b.estado}
+                            </span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 12px; font-size: 0.88rem;">
+                            <div><strong>Pasajero:</strong> ${b.nombre_pasajero}</div>
+                            <div><strong>RUT:</strong> ${b.rut_pasajero}</div>
+                            <div><strong>Asiento:</strong> #${b.numero_asiento} (${b.tipo_asiento_display || b.tipo_asiento})</div>
+                            <div><strong>Categoría Bus:</strong> ${b.tipo_bus} (${b.patente_bus})</div>
+                            <div><strong>Precio Pagado:</strong> $${parseInt(b.precio_pagado).toLocaleString('es-CL')}</div>
+                        </div>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748b; font-family: monospace; background: white; padding: 8px 12px; border: 1px dashed #cbd5e1; border-radius: 4px;">
+                            <span>UUID: ${b.codigo_boleto}</span>
+                            <span>SHA-256: ${b.codigo_hash.substring(0, 16)}...</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+        } catch (e) {
+            container.innerHTML = `<div style="color: #e62629; text-align: center; padding: 20px;">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function loadOrdenes() {
+        const tbody = document.getElementById('ordenesTableBody');
+        const countText = document.getElementById('ordenesCountText');
+        const estadoFiltro = document.getElementById('filtroOrdenEstado').value;
+
+        const params = new URLSearchParams();
+        if (estadoFiltro) params.append('estado', estadoFiltro);
+
+        try {
+            const res = await BusdrexAPI.authFetch(`/api/mis-ordenes/?${params.toString()}`);
+            if (!res.ok) throw new Error('Error al cargar órdenes.');
+
+            const data = await res.json();
+            const ordenes = data.results || data;
+
+            countText.textContent = `${ordenes.length} órdenes registradas`;
+
+            if (!ordenes || ordenes.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 30px; color: #64748b;">No tienes órdenes registradas.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = ordenes.map(o => {
+                const fechaObj = new Date(o.fecha_creacion);
+                const fechaStr = fechaObj.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+                const badgeClass = `badge-${o.estado.toLowerCase()}`;
+                const cantidadPasajes = (o.detalles?.length) || (o.boletos?.length) || 0;
+
+                let acciones = '-';
+                if (o.estado === 'PENDIENTE') {
+                    acciones = `
+                        <div style="display: flex; gap: 8px; justify-content: center;">
+                            <button onclick="pagarOrdenPendiente(${o.id})" class="btn-select-service" style="padding: 4px 10px; font-size: 0.8rem;">
+                                Pagar
+                            </button>
+                            <button onclick="cancelarOrdenPendiente(${o.id})" class="btn-login" style="padding: 4px 10px; font-size: 0.8rem; color: #e62629; border-color: #e62629;">
+                                Cancelar
+                            </button>
+                        </div>
+                    `;
+                }
+
+                return `
+                    <tr>
+                        <td><strong>#${o.id}</strong> <div style="font-size: 0.72rem; color: #94a3b8;">${o.codigo_transaccion.substring(0, 8)}...</div></td>
+                        <td>${fechaStr}</td>
+                        <td><span class="badge ${badgeClass}">${o.estado_display}</span></td>
+                        <td style="font-weight: 800; color: #0066cc;">$${parseInt(o.total).toLocaleString('es-CL')}</td>
+                        <td>${cantidadPasajes} pasajes</td>
+                        <td style="text-align: center;">${acciones}</td>
+                    </tr>
+                `;
+            }).join('');
+
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #e62629;">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function pagarOrdenPendiente(ventaId) {
+        if (!confirm('¿Deseas completar el pago de esta orden pendiente?')) return;
+        try {
+            const res = await BusdrexAPI.authFetch(`/api/ventas/${ventaId}/pagar/`, { method: 'POST' });
+            if (res.ok) {
+                alert('¡Pago completado exitosamente!');
+                loadOrdenes();
+                switchTab('boletos');
+            } else {
+                const err = await res.json();
+                alert(`Error en el pago: ${err.error || 'Verifica la disponibilidad de los asientos.'}`);
+            }
+        } catch (e) {
+            alert('Error de conexión.');
+        }
+    }
+
+    async function cancelarOrdenPendiente(ventaId) {
+        if (!confirm('¿Seguro que deseas cancelar esta orden pendiente?')) return;
+        try {
+            const res = await BusdrexAPI.authFetch(`/api/ventas/${ventaId}/cancelar/`, { method: 'POST' });
+            if (res.ok) {
+                alert('Orden cancelada exitosamente.');
+                loadOrdenes();
+            } else {
+                const err = await res.json();
+                alert(`Error al cancelar: ${err.error || 'No se pudo cancelar.'}`);
+            }
+        } catch (e) {
+            alert('Error de conexión.');
+        }
+    }
+
+    loadBoletos();
+</script>
+{% endblock %}

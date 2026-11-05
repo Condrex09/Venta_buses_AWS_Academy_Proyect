@@ -1,0 +1,1015 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Panel de Control - Administrador de Flota | BusDrex{% endblock %}
+
+{% block content %}
+<div class="section-container" style="max-width: 1250px;">
+    <div class="section-header" style="flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h2>Panel de Gestión - Administrador de Flota</h2>
+            <p style="color: #64748b; font-size: 0.9rem;">Control integral de itinerarios, flota, terminales, tarifas y órdenes</p>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="/api/docs/" target="_blank" class="btn-select-service" style="background: #0284c7; padding: 8px 16px; font-size: 0.85rem;">
+                📄 Swagger UI (API Docs)
+            </a>
+        </div>
+    </div>
+
+    <!-- Pestañas de Navegación del Panel de Administración -->
+    <div style="display: flex; gap: 8px; margin-bottom: 24px; overflow-x: auto; border-bottom: 2px solid #e2e8f0; padding-bottom: 2px;">
+        <button class="btn-select-service admin-tab-btn active" onclick="showAdminTab('servicios')">🚌 Servicios</button>
+        <button class="btn-login admin-tab-btn" onclick="showAdminTab('terminales')">🏢 Terminales</button>
+        <button class="btn-login admin-tab-btn" onclick="showAdminTab('rutas')">🛣️ Rutas</button>
+        <button class="btn-login admin-tab-btn" onclick="showAdminTab('buses')">🚍 Buses</button>
+        <button class="btn-login admin-tab-btn" onclick="showAdminTab('ofertas')">🏷️ Ofertas</button>
+        <button class="btn-login admin-tab-btn" onclick="showAdminTab('ventas')">💳 Ventas / Órdenes</button>
+        <button class="btn-login admin-tab-btn" onclick="showAdminTab('carros')">🛒 Carros Usuarios</button>
+        <button class="btn-login admin-tab-btn" onclick="showAdminTab('usuarios')">👥 Usuarios</button>
+    </div>
+
+    <!-- =========================================================================
+         TAB 1: SERVICIOS E ITINERARIOS
+         ========================================================================= -->
+    <div id="tab_servicios" class="admin-tab-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Itinerarios Programados con Tarifas Diferenciadas</h3>
+            <button class="btn-search" style="height: 38px; padding: 8px 18px; font-size: 0.88rem;" onclick="openModal('modalNuevoServicio')">
+                + Nuevo Servicio
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Ruta</th>
+                        <th>Fecha y Hora</th>
+                        <th>Bus Asignado</th>
+                        <th>Tarifa Semicama</th>
+                        <th>Tarifa Cama</th>
+                        <th>Disponibles</th>
+                        <th style="text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="adminServiciosTbody"><tr><td colspan="8" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 2: GEOGRAFÍA Y TERMINALES (3FN)
+         ========================================================================= -->
+    <div id="tab_terminales" class="admin-tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
+            <h3>Terminales, Ciudades y Regiones (3FN)</h3>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-login" style="height: 38px; padding: 8px 14px; font-size: 0.85rem;" onclick="openModal('modalNuevaRegion')">
+                    + Nueva Región
+                </button>
+                <button class="btn-login" style="height: 38px; padding: 8px 14px; font-size: 0.85rem;" onclick="openModal('modalNuevaCiudad')">
+                    + Nueva Ciudad
+                </button>
+                <button class="btn-search" style="height: 38px; padding: 8px 18px; font-size: 0.88rem;" onclick="openModal('modalNuevoTerminal')">
+                    + Nuevo Terminal
+                </button>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre del Terminal</th>
+                        <th>Ciudad</th>
+                        <th>Región</th>
+                        <th style="text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="adminTerminalesTbody"><tr><td colspan="5" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 3: RUTAS
+         ========================================================================= -->
+    <div id="tab_rutas" class="admin-tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Rutas Interurbanas</h3>
+            <button class="btn-search" style="height: 38px; padding: 8px 18px; font-size: 0.88rem;" onclick="openModal('modalNuevaRuta')">
+                + Nueva Ruta
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Terminal de Origen</th>
+                        <th>Terminal de Destino</th>
+                        <th>Duración Estimada</th>
+                        <th style="text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="adminRutasTbody"><tr><td colspan="5" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 4: BUSES
+         ========================================================================= -->
+    <div id="tab_buses" class="admin-tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Flota de Buses</h3>
+            <button class="btn-search" style="height: 38px; padding: 8px 18px; font-size: 0.88rem;" onclick="openModal('modalNuevoBus')">
+                + Nuevo Bus
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Patente</th>
+                        <th>Modelo</th>
+                        <th>Capacidad</th>
+                        <th>Tipo / Confort</th>
+                        <th style="text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="adminBusesTbody"><tr><td colspan="6" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 5: OFERTAS
+         ========================================================================= -->
+    <div id="tab_ofertas" class="admin-tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Ofertas y Promociones</h3>
+            <button class="btn-search" style="height: 38px; padding: 8px 18px; font-size: 0.88rem;" onclick="openModal('modalNuevaOferta')">
+                + Nueva Oferta
+            </button>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Título</th>
+                        <th>Descuento / Precio</th>
+                        <th>Ruta Asociada</th>
+                        <th>Vigencia</th>
+                        <th>Estado</th>
+                        <th style="text-align: center;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="adminOfertasTbody"><tr><td colspan="7" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 6: VENTAS Y ÓRDENES
+         ========================================================================= -->
+    <div id="tab_ventas" class="admin-tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Auditoría de Ventas y Transiciones de Estado</h3>
+            <div style="font-size: 0.85rem; color: #64748b;">
+                Filtro estado:
+                <select id="adminFiltroVentaEstado" class="form-control" style="display: inline-block; width: auto; padding: 6px;" onchange="loadAdminVentas()">
+                    <option value="">Todas</option>
+                    <option value="PENDIENTE">PENDIENTE</option>
+                    <option value="PAGADO">PAGADO</option>
+                    <option value="ENTREGADO">ENTREGADO</option>
+                    <option value="CANCELADO">CANCELADO</option>
+                </select>
+            </div>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Fecha</th>
+                        <th>Total</th>
+                        <th>Estado Actual</th>
+                        <th>Boletos</th>
+                        <th style="text-align: center;">Cambiar Estado (Transiciones)</th>
+                    </tr>
+                </thead>
+                <tbody id="adminVentasTbody"><tr><td colspan="7" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 7: CARROS DE USUARIOS
+         ========================================================================= -->
+    <div id="tab_carros" class="admin-tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Carros de Pasajes Activos en MySQL</h3>
+            <button class="btn-login" style="padding: 6px 14px; font-size: 0.85rem;" onclick="loadAdminCarros()">Refrescar</button>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID Carro</th>
+                        <th>Usuario Titular</th>
+                        <th>Cantidad Pasajes</th>
+                        <th>Total Actual</th>
+                        <th>Detalle de Asientos</th>
+                        <th style="text-align: center;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="adminCarrosTbody"><tr><td colspan="6" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- =========================================================================
+         TAB 8: USUARIOS
+         ========================================================================= -->
+    <div id="tab_usuarios" class="admin-tab-content" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Cuentas de Usuarios del Sistema</h3>
+            <button class="btn-login" style="padding: 6px 14px; font-size: 0.85rem;" onclick="loadAdminUsuarios()">Refrescar</button>
+        </div>
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Usuario</th>
+                        <th>Nombre y Apellido</th>
+                        <th>Teléfono</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Estado Cuenta</th>
+                        <th style="text-align: center;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="adminUsuariosTbody"><tr><td colspan="8" style="text-align: center;">Cargando...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- =========================================================================
+     MODALES PARA CREACIÓN DE RECURSOS
+     ========================================================================= -->
+<!-- Modal Nuevo Servicio -->
+<div id="modalNuevoServicio" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 8px; max-width: 550px; width: 100%; padding: 24px;">
+        <h3 style="color: #00264d; margin-bottom: 16px;">Crear Nuevo Servicio</h3>
+        <form onsubmit="handleCrearServicio(event)">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Ruta</label>
+                <select id="nuevoServicioRuta" class="form-control" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Bus Asignado</label>
+                <select id="nuevoServicioBus" class="form-control" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Fecha y Hora de Salida</label>
+                <input type="datetime-local" id="nuevoServicioFecha" class="form-control" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Tarifa Semicama (CLP)</label>
+                    <input type="number" id="nuevoServicioTarifaSemicama" class="form-control" value="15000" required>
+                </div>
+                <div class="form-group">
+                    <label>Tarifa Salón Cama (CLP)</label>
+                    <input type="number" id="nuevoServicioTarifaCama" class="form-control" value="22000" required>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-login" onclick="closeModal('modalNuevoServicio')">Cancelar</button>
+                <button type="submit" class="btn-register">Guardar Servicio</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nueva Región -->
+<div id="modalNuevaRegion" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 8px; max-width: 480px; width: 100%; padding: 24px;">
+        <h3 style="color: #00264d; margin-bottom: 16px;">Crear Nueva Región</h3>
+        <form onsubmit="handleCrearRegion(event)">
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Nombre de la Región</label>
+                <input type="text" id="nuevaRegionNombre" class="form-control" placeholder="Ej. Región de Los Ríos" required>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-login" onclick="closeModal('modalNuevaRegion')">Cancelar</button>
+                <button type="submit" class="btn-register">Guardar Región</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nueva Ciudad -->
+<div id="modalNuevaCiudad" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 8px; max-width: 480px; width: 100%; padding: 24px;">
+        <h3 style="color: #00264d; margin-bottom: 16px;">Crear Nueva Ciudad</h3>
+        <form onsubmit="handleCrearCiudad(event)">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Región Perteneciente</label>
+                <select id="nuevaCiudadRegionSelect" class="form-control" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Nombre de la Ciudad</label>
+                <input type="text" id="nuevaCiudadNombre" class="form-control" placeholder="Ej. Valdivia" required>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-login" onclick="closeModal('modalNuevaCiudad')">Cancelar</button>
+                <button type="submit" class="btn-register">Guardar Ciudad</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nuevo Terminal (Selects encadenados: Región -> Ciudad -> Terminal) -->
+<div id="modalNuevoTerminal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 8px; max-width: 500px; width: 100%; padding: 24px;">
+        <h3 style="color: #00264d; margin-bottom: 16px;">Crear Terminal de Buses (3FN)</h3>
+        <form onsubmit="handleCrearTerminal(event)">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>1. Seleccionar Región</label>
+                <select id="nuevoTerminalRegionSelect" class="form-control" onchange="cargarCiudadesParaTerminal(this.value)" required>
+                    <option value="">Seleccione una Región...</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>2. Seleccionar Ciudad (Encadenada)</label>
+                <select id="nuevoTerminalCiudadSelect" class="form-control" required>
+                    <option value="">Seleccione primero una Región...</option>
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>3. Nombre del Terminal</label>
+                <input type="text" id="nuevoTerminalNombre" class="form-control" placeholder="Ej. Terminal Rodoviario Valdivia" required>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-login" onclick="closeModal('modalNuevoTerminal')">Cancelar</button>
+                <button type="submit" class="btn-register">Guardar Terminal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nueva Ruta -->
+<div id="modalNuevaRuta" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 8px; max-width: 500px; width: 100%; padding: 24px;">
+        <h3 style="color: #00264d; margin-bottom: 16px;">Crear Ruta Interurbana</h3>
+        <form onsubmit="handleCrearRuta(event)">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Terminal de Origen</label>
+                <select id="nuevaRutaOrigen" class="form-control" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Terminal de Destino</label>
+                <select id="nuevaRutaDestino" class="form-control" required></select>
+            </div>
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label>Duración Estimada (Minutos)</label>
+                <input type="number" id="nuevaRutaDuracion" class="form-control" placeholder="Ej. 180 (para 3 hrs)" min="1" required>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-login" onclick="closeModal('modalNuevaRuta')">Cancelar</button>
+                <button type="submit" class="btn-register">Guardar Ruta</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nuevo Bus -->
+<div id="modalNuevoBus" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 8px; max-width: 500px; width: 100%; padding: 24px;">
+        <h3 style="color: #00264d; margin-bottom: 16px;">Registrar Nuevo Bus en Flota</h3>
+        <form onsubmit="handleCrearBus(event)">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Patente</label>
+                <input type="text" id="nuevoBusPatente" class="form-control" placeholder="Ej. ABCD-12" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Modelo</label>
+                <input type="text" id="nuevoBusModelo" class="form-control" placeholder="Ej. Marcopolo G8 1800 DD" required>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Capacidad Asientos</label>
+                    <input type="number" id="nuevoBusCapacidad" class="form-control" value="40" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoría</label>
+                    <select id="nuevoBusTipo" class="form-control" required>
+                        <option value="SEMICAMA">Semicama</option>
+                        <option value="SALON_CAMA">Salón Cama</option>
+                        <option value="PREMIUM">Premium</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-login" onclick="closeModal('modalNuevoBus')">Cancelar</button>
+                <button type="submit" class="btn-register">Guardar Bus</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Nueva Oferta -->
+<div id="modalNuevaOferta" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center; padding: 20px;">
+    <div style="background: white; border-radius: 8px; max-width: 560px; width: 100%; padding: 24px;">
+        <h3 style="color: #00264d; margin-bottom: 16px;">Crear Oferta / Promoción</h3>
+        <form onsubmit="handleCrearOferta(event)">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Título de la Oferta</label>
+                <input type="text" id="nuevaOfertaTitulo" class="form-control" placeholder="Ej. Escapada a Viña del Mar" required>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Descripción</label>
+                <textarea id="nuevaOfertaDesc" class="form-control" rows="2" placeholder="Detalle comercial..."></textarea>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label>Ruta Asociada <span style="font-size: 0.8rem; color: #94a3b8;">(Opcional)</span></label>
+                <select id="nuevaOfertaRuta" class="form-control">
+                    <option value="">-- Aplica a todas las rutas --</option>
+                </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label>Descuento (%)</label>
+                    <input type="number" id="nuevaOfertaDescuento" class="form-control" value="20" min="0" max="100" step="0.01">
+                </div>
+                <div class="form-group">
+                    <label>Estado Inicial</label>
+                    <select id="nuevaOfertaActiva" class="form-control">
+                        <option value="true">Activa</option>
+                        <option value="false">Inactiva</option>
+                    </select>
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label>Fecha Inicio</label>
+                    <input type="date" id="nuevaOfertaInicio" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Fecha Fin</label>
+                    <input type="date" id="nuevaOfertaFin" class="form-control" required>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="btn-login" onclick="closeModal('modalNuevaOferta')">Cancelar</button>
+                <button type="submit" class="btn-register">Guardar Oferta</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Verificar permisos de Administrador de Flota
+    if (!BusdrexAPI.isAdmin()) {
+        alert('Acceso restringido: Se requieren privilegios de Administrador de Flota.');
+        window.location.href = `/login/?next=${encodeURIComponent(window.location.pathname)}`;
+    }
+
+    function showAdminTab(tabKey) {
+        document.querySelectorAll('.admin-tab-content').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.admin-tab-btn').forEach(btn => {
+            btn.className = 'btn-login admin-tab-btn';
+        });
+
+        const activeTab = document.getElementById(`tab_${tabKey}`);
+        if (activeTab) activeTab.style.display = 'block';
+
+        // Estilo activo
+        event.target.className = 'btn-select-service admin-tab-btn active';
+
+        // Cargar datos correspondientes
+        if (tabKey === 'servicios') loadAdminServicios();
+        if (tabKey === 'terminales') loadAdminTerminales();
+        if (tabKey === 'rutas') loadAdminRutas();
+        if (tabKey === 'buses') loadAdminBuses();
+        if (tabKey === 'ofertas') loadAdminOfertas();
+        if (tabKey === 'ventas') loadAdminVentas();
+        if (tabKey === 'carros') loadAdminCarros();
+        if (tabKey === 'usuarios') loadAdminUsuarios();
+    }
+
+    function openModal(modalId) {
+        const m = document.getElementById(modalId);
+        if (m) m.style.display = 'flex';
+        // Pre-cargar selects auxiliares según el modal
+        if (modalId === 'modalNuevoServicio') populateServicioSelects();
+        if (modalId === 'modalNuevaRuta') populateRutaSelects();
+        if (modalId === 'modalNuevaCiudad') populateCiudadModalSelects();
+        if (modalId === 'modalNuevoTerminal') populateTerminalModalSelects();
+        if (modalId === 'modalNuevaOferta') populateOfertaRutaSelect();
+    }
+
+    function closeModal(modalId) {
+        const m = document.getElementById(modalId);
+        if (m) m.style.display = 'none';
+    }
+
+    // --------------------------------------------------------------------------
+    // 1. CARGA DE SERVICIOS
+    // --------------------------------------------------------------------------
+    async function loadAdminServicios() {
+        const tbody = document.getElementById('adminServiciosTbody');
+        try {
+            const res = await BusdrexAPI.authFetch('/api/servicios/');
+            const data = await res.json();
+            const list = data.results || data;
+
+            tbody.innerHTML = list.map(s => `
+                <tr>
+                    <td><strong>#${s.id}</strong></td>
+                    <td>${s.ruta.origen.ciudad_nombre || s.ruta.origen.ciudad} ➔ ${s.ruta.destino.ciudad_nombre || s.ruta.destino.ciudad}</td>
+                    <td>${new Date(s.fecha_hora_salida).toLocaleString('es-CL')}</td>
+                    <td>${s.bus.patente} (${s.bus.modelo})</td>
+                    <td style="color: #0284c7; font-weight: 700;">$${parseInt(s.tarifa_semicama).toLocaleString('es-CL')}</td>
+                    <td style="color: #1e40af; font-weight: 700;">$${parseInt(s.tarifa_cama).toLocaleString('es-CL')}</td>
+                    <td>${s.asientos_disponibles} / ${s.capacidad_total}</td>
+                    <td style="text-align: center;">
+                        <button onclick="eliminarRecurso('/api/servicios/${s.id}/', loadAdminServicios)" style="color: #e62629; border: none; background: none; cursor: pointer;">🗑️</button>
+                    </td>
+                </tr>
+            `).join('');
+        } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="8" style="color: red;">Error: ${e.message}</td></tr>`;
+        }
+    }
+
+    async function populateServicioSelects() {
+        const selectRuta = document.getElementById('nuevoServicioRuta');
+        const selectBus = document.getElementById('nuevoServicioBus');
+
+        const resRutas = await BusdrexAPI.authFetch('/api/rutas/');
+        const dataRutas = await resRutas.json();
+        const rutas = dataRutas.results || dataRutas;
+        selectRuta.innerHTML = rutas.map(r => `<option value="${r.id}">${r.origen.ciudad_nombre || r.origen.ciudad} ➔ ${r.destino.ciudad_nombre || r.destino.ciudad} (${r.duracion_formateada || r.duracion_minutos + ' min'})</option>`).join('');
+
+        const resBuses = await BusdrexAPI.authFetch('/api/buses/');
+        const dataBuses = await resBuses.json();
+        const buses = dataBuses.results || dataBuses;
+        selectBus.innerHTML = buses.map(b => `<option value="${b.id}">${b.patente} - ${b.modelo} (${b.tipo_bus_display})</option>`).join('');
+    }
+
+    async function handleCrearServicio(e) {
+        e.preventDefault();
+        const payload = {
+            ruta: document.getElementById('nuevoServicioRuta').value,
+            bus: document.getElementById('nuevoServicioBus').value,
+            fecha_hora_salida: document.getElementById('nuevoServicioFecha').value,
+            tarifa_semicama: document.getElementById('nuevoServicioTarifaSemicama').value,
+            tarifa_cama: document.getElementById('nuevoServicioTarifaCama').value
+        };
+
+        const res = await BusdrexAPI.authFetch('/api/servicios/', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            closeModal('modalNuevoServicio');
+            loadAdminServicios();
+            alert('Servicio programado e inventario de asientos generado automáticamente.');
+        } else {
+            alert('Error al guardar servicio.');
+        }
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. GEOGRAFÍA Y TERMINALES (3FN: REGIONES -> CIUDADES -> TERMINALES)
+    // --------------------------------------------------------------------------
+    async function loadAdminTerminales() {
+        const tbody = document.getElementById('adminTerminalesTbody');
+        const res = await BusdrexAPI.authFetch('/api/terminales/');
+        const data = await res.json();
+        const list = data.results || data;
+
+        tbody.innerHTML = list.map(t => `
+            <tr>
+                <td><strong>#${t.id}</strong></td>
+                <td>${t.nombre}</td>
+                <td>${t.ciudad_nombre || t.ciudad}</td>
+                <td>${t.region_nombre || t.region || '-'}</td>
+                <td style="text-align: center;">
+                    <button onclick="eliminarRecurso('/api/terminales/${t.id}/', loadAdminTerminales)" style="color: red; border: none; background: none; cursor: pointer;">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function populateCiudadModalSelects() {
+        const selectReg = document.getElementById('nuevaCiudadRegionSelect');
+        const res = await BusdrexAPI.authFetch('/api/regiones/');
+        const data = await res.json();
+        const list = data.results || data;
+        selectReg.innerHTML = list.map(r => `<option value="${r.id}">${r.nombre}</option>`).join('');
+    }
+
+    async function populateTerminalModalSelects() {
+        const selectReg = document.getElementById('nuevoTerminalRegionSelect');
+        const selectCiu = document.getElementById('nuevoTerminalCiudadSelect');
+        selectCiu.innerHTML = '<option value="">Seleccione primero una Región...</option>';
+
+        const res = await BusdrexAPI.authFetch('/api/regiones/');
+        const data = await res.json();
+        const list = data.results || data;
+        selectReg.innerHTML = '<option value="">Seleccione una Región...</option>' +
+            list.map(r => `<option value="${r.id}">${r.nombre}</option>`).join('');
+    }
+
+    async function cargarCiudadesParaTerminal(regionId) {
+        const selectCiu = document.getElementById('nuevoTerminalCiudadSelect');
+        if (!regionId) {
+            selectCiu.innerHTML = '<option value="">Seleccione primero una Región...</option>';
+            return;
+        }
+        const res = await BusdrexAPI.authFetch(`/api/ciudades/?region=${regionId}`);
+        const data = await res.json();
+        const list = data.results || data;
+        if (!list || list.length === 0) {
+            selectCiu.innerHTML = '<option value="">Sin ciudades en esta región</option>';
+        } else {
+            selectCiu.innerHTML = list.map(c => `<option value="${c.id}">${c.nombre}</option>`).join('');
+        }
+    }
+
+    async function handleCrearRegion(e) {
+        e.preventDefault();
+        const nombre = document.getElementById('nuevaRegionNombre').value.trim();
+        const res = await BusdrexAPI.authFetch('/api/regiones/', {
+            method: 'POST',
+            body: JSON.stringify({ nombre })
+        });
+        if (res.ok) {
+            closeModal('modalNuevaRegion');
+            alert('Región creada exitosamente.');
+            loadAdminTerminales();
+        } else {
+            alert('Error al crear región.');
+        }
+    }
+
+    async function handleCrearCiudad(e) {
+        e.preventDefault();
+        const region = document.getElementById('nuevaCiudadRegionSelect').value;
+        const nombre = document.getElementById('nuevaCiudadNombre').value.trim();
+        const res = await BusdrexAPI.authFetch('/api/ciudades/', {
+            method: 'POST',
+            body: JSON.stringify({ region, nombre })
+        });
+        if (res.ok) {
+            closeModal('modalNuevaCiudad');
+            alert('Ciudad creada exitosamente.');
+            loadAdminTerminales();
+        } else {
+            alert('Error al crear ciudad.');
+        }
+    }
+
+    async function handleCrearTerminal(e) {
+        e.preventDefault();
+        const ciudad = document.getElementById('nuevoTerminalCiudadSelect').value;
+        const nombre = document.getElementById('nuevoTerminalNombre').value.trim();
+
+        if (!ciudad) {
+            alert('Debe seleccionar una ciudad válida.');
+            return;
+        }
+
+        const res = await BusdrexAPI.authFetch('/api/terminales/', {
+            method: 'POST',
+            body: JSON.stringify({ nombre, ciudad })
+        });
+        if (res.ok) {
+            closeModal('modalNuevoTerminal');
+            loadAdminTerminales();
+            alert('Terminal creado exitosamente en 3FN.');
+        } else {
+            alert('Error al guardar terminal.');
+        }
+    }
+
+    // --------------------------------------------------------------------------
+    // 3. RUTAS
+    // --------------------------------------------------------------------------
+    async function loadAdminRutas() {
+        const tbody = document.getElementById('adminRutasTbody');
+        const res = await BusdrexAPI.authFetch('/api/rutas/');
+        const data = await res.json();
+        const list = data.results || data;
+
+        tbody.innerHTML = list.map(r => `
+            <tr>
+                <td><strong>#${r.id}</strong></td>
+                <td>${r.origen.nombre} (${r.origen.ciudad_nombre || r.origen.ciudad})</td>
+                <td>${r.destino.nombre} (${r.destino.ciudad_nombre || r.destino.ciudad})</td>
+                <td>${r.duracion_formateada || r.duracion_minutos + ' min'}</td>
+                <td style="text-align: center;">
+                    <button onclick="eliminarRecurso('/api/rutas/${r.id}/', loadAdminRutas)" style="color: red; border: none; background: none; cursor: pointer;">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function populateRutaSelects() {
+        const orig = document.getElementById('nuevaRutaOrigen');
+        const dest = document.getElementById('nuevaRutaDestino');
+        const res = await BusdrexAPI.authFetch('/api/terminales/');
+        const data = await res.json();
+        const list = data.results || data;
+        const options = list.map(t => `<option value="${t.id}">${t.ciudad_nombre || t.ciudad} - ${t.nombre}</option>`).join('');
+        orig.innerHTML = options;
+        dest.innerHTML = options;
+    }
+
+    async function handleCrearRuta(e) {
+        e.preventDefault();
+        const orig = document.getElementById('nuevaRutaOrigen').value;
+        const dest = document.getElementById('nuevaRutaDestino').value;
+        const duracion = parseInt(document.getElementById('nuevaRutaDuracion').value, 10);
+
+        if (orig === dest) {
+            alert('El terminal de origen no puede ser idéntico al de destino.');
+            return;
+        }
+
+        const payload = {
+            origen_id: orig,
+            destino_id: dest,
+            duracion_minutos: duracion
+        };
+        const res = await BusdrexAPI.authFetch('/api/rutas/', { method: 'POST', body: JSON.stringify(payload) });
+        if (res.ok) { closeModal('modalNuevaRuta'); loadAdminRutas(); }
+        else { const err = await res.json(); alert(err.destino_id || err.error || 'Error al guardar ruta.'); }
+    }
+
+    // --------------------------------------------------------------------------
+    // 4. BUSES
+    // --------------------------------------------------------------------------
+    async function loadAdminBuses() {
+        const tbody = document.getElementById('adminBusesTbody');
+        const res = await BusdrexAPI.authFetch('/api/buses/');
+        const data = await res.json();
+        const list = data.results || data;
+
+        tbody.innerHTML = list.map(b => `
+            <tr>
+                <td><strong>#${b.id}</strong></td>
+                <td><strong>${b.patente}</strong></td>
+                <td>${b.modelo}</td>
+                <td>${b.capacidad_total} asientos</td>
+                <td><span class="bus-badge">${b.tipo_bus_display}</span></td>
+                <td style="text-align: center;">
+                    <button onclick="eliminarRecurso('/api/buses/${b.id}/', loadAdminBuses)" style="color: red; border: none; background: none; cursor: pointer;">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function handleCrearBus(e) {
+        e.preventDefault();
+        const payload = {
+            patente: document.getElementById('nuevoBusPatente').value.trim(),
+            modelo: document.getElementById('nuevoBusModelo').value.trim(),
+            capacidad_total: document.getElementById('nuevoBusCapacidad').value,
+            tipo_bus: document.getElementById('nuevoBusTipo').value
+        };
+        const res = await BusdrexAPI.authFetch('/api/buses/', { method: 'POST', body: JSON.stringify(payload) });
+        if (res.ok) { closeModal('modalNuevoBus'); loadAdminBuses(); }
+        else { alert('Error al registrar bus en flota.'); }
+    }
+
+    // --------------------------------------------------------------------------
+    // 5. OFERTAS
+    // --------------------------------------------------------------------------
+    async function loadAdminOfertas() {
+        const tbody = document.getElementById('adminOfertasTbody');
+        const res = await BusdrexAPI.authFetch('/api/ofertas/');
+        const data = await res.json();
+        const list = data.results || data;
+
+        tbody.innerHTML = list.map(o => `
+            <tr>
+                <td><strong>#${o.id}</strong></td>
+                <td>${o.titulo}</td>
+                <td>${o.descuento_porcentaje ? o.descuento_porcentaje + '% OFF' : '$' + parseInt(o.precio_desde || 0).toLocaleString('es-CL')}</td>
+                <td>${o.ruta_display || 'Todas las rutas'}</td>
+                <td>${o.fecha_inicio} al ${o.fecha_fin}</td>
+                <td><span class="badge ${o.activa ? 'badge-pagado' : 'badge-cancelado'}">${o.activa ? 'Activa' : 'Inactiva'}</span></td>
+                <td style="text-align: center;">
+                    <button onclick="eliminarRecurso('/api/ofertas/${o.id}/', loadAdminOfertas)" style="color: red; border: none; background: none; cursor: pointer;">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function handleCrearOferta(e) {
+        e.preventDefault();
+
+        // Validación: fecha_fin >= fecha_inicio
+        const fechaInicio = document.getElementById('nuevaOfertaInicio').value;
+        const fechaFin = document.getElementById('nuevaOfertaFin').value;
+        if (fechaFin < fechaInicio) {
+            alert('La fecha de fin de vigencia no puede ser anterior a la fecha de inicio.');
+            return;
+        }
+
+        // Construir payload; ruta es opcional (null si no se seleccionó)
+        const rutaSeleccionada = document.getElementById('nuevaOfertaRuta').value;
+        const payload = {
+            titulo: document.getElementById('nuevaOfertaTitulo').value.trim(),
+            descripcion: document.getElementById('nuevaOfertaDesc').value.trim() || '',
+            descuento_porcentaje: document.getElementById('nuevaOfertaDescuento').value || 0,
+            ruta: rutaSeleccionada ? parseInt(rutaSeleccionada, 10) : null,
+            fecha_inicio: fechaInicio,
+            fecha_fin: fechaFin,
+            activa: document.getElementById('nuevaOfertaActiva').value === 'true'
+        };
+        const res = await BusdrexAPI.authFetch('/api/ofertas/', { method: 'POST', body: JSON.stringify(payload) });
+        if (res.ok) { closeModal('modalNuevaOferta'); loadAdminOfertas(); }
+        else {
+            const err = await res.json();
+            alert('Error al guardar oferta: ' + (err.detail || JSON.stringify(err)));
+        }
+    }
+
+    // Pre-carga las rutas disponibles en el selector del modal de oferta
+    async function populateOfertaRutaSelect() {
+        const select = document.getElementById('nuevaOfertaRuta');
+        try {
+            const res = await BusdrexAPI.authFetch('/api/rutas/');
+            const data = await res.json();
+            const rutas = data.results || data;
+            // Opción "todas las rutas" siempre primera
+            select.innerHTML = '<option value="">-- Aplica a todas las rutas --</option>' +
+                rutas.map(r =>
+                    `<option value="${r.id}">${r.origen.ciudad_nombre || r.origen.ciudad} ➜ ${r.destino.ciudad_nombre || r.destino.ciudad} (${r.duracion_formateada || r.duracion_minutos + ' min'})</option>`
+                ).join('');
+        } catch (e) {
+            console.error('Error al cargar rutas para oferta:', e);
+        }
+    }
+
+    // --------------------------------------------------------------------------
+    // 6. VENTAS Y GESTIÓN DE TRANSICIONES
+    // --------------------------------------------------------------------------
+    async function loadAdminVentas() {
+        const tbody = document.getElementById('adminVentasTbody');
+        const estadoFiltro = document.getElementById('adminFiltroVentaEstado').value;
+        const params = new URLSearchParams();
+        if (estadoFiltro) params.append('estado', estadoFiltro);
+
+        const res = await BusdrexAPI.authFetch(`/api/ventas/?${params.toString()}`);
+        const data = await res.json();
+        const list = data.results || data;
+
+        tbody.innerHTML = list.map(v => `
+            <tr>
+                <td><strong>#${v.id}</strong></td>
+                <td>${v.usuario_username}</td>
+                <td>${new Date(v.fecha_creacion).toLocaleDateString('es-CL')}</td>
+                <td style="font-weight: 700; color: #0066cc;">$${parseInt(v.total).toLocaleString('es-CL')}</td>
+                <td><span class="badge badge-${v.estado.toLowerCase()}">${v.estado_display}</span></td>
+                <td>${(v.boletos?.length) || (v.detalles?.length) || 0} pasajes</td>
+                <td style="text-align: center;">
+                    <select onchange="cambiarEstadoVentaAdmin(${v.id}, this.value, '${v.estado}')" class="form-control" style="padding: 4px 8px; font-size: 0.8rem; width: auto; display: inline-block;">
+                        <option value="">Cambiar a...</option>
+                        ${v.estado === 'PENDIENTE' ? '<option value="PAGADO">PAGADO</option><option value="CANCELADO">CANCELADO</option>' : ''}
+                        ${v.estado === 'PAGADO' ? '<option value="ENTREGADO">ENTREGADO</option><option value="CANCELADO">CANCELADO (Reponer)</option>' : ''}
+                    </select>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function cambiarEstadoVentaAdmin(ventaId, nuevoEstado, estadoActual) {
+        if (!nuevoEstado) return;
+        if (!confirm(`¿Confirmas transicionar la Venta #${ventaId} de '${estadoActual}' a '${nuevoEstado}'?`)) {
+            loadAdminVentas();
+            return;
+        }
+
+        try {
+            const res = await BusdrexAPI.authFetch(`/api/ventas/${ventaId}/estado/`, {
+                method: 'PATCH',
+                body: JSON.stringify({ estado: nuevoEstado })
+            });
+
+            if (res.ok) {
+                alert(`Estado actualizado a ${nuevoEstado} exitosamente.`);
+                loadAdminVentas();
+            } else {
+                const err = await res.json();
+                alert(`Error en la transición: ${err.error || 'Transición no permitida.'}`);
+                loadAdminVentas();
+            }
+        } catch (e) {
+            alert('Error de conexión.');
+            loadAdminVentas();
+        }
+    }
+
+    // --------------------------------------------------------------------------
+    // 7. CARROS DE USUARIOS
+    // --------------------------------------------------------------------------
+    async function loadAdminCarros() {
+        const tbody = document.getElementById('adminCarrosTbody');
+        const res = await BusdrexAPI.authFetch('/api/admin/carros/');
+        const data = await res.json();
+        const list = data.results || data;
+
+        tbody.innerHTML = list.map(c => `
+            <tr>
+                <td><strong>#${c.id}</strong></td>
+                <td>${c.usuario_username}</td>
+                <td>${c.cantidad_items} pasajes</td>
+                <td style="font-weight: 700; color: #0066cc;">$${parseInt(c.total).toLocaleString('es-CL')}</td>
+                <td style="font-size: 0.8rem; color: #64748b;">
+                    ${c.items.map(i => `Asiento #${i.numero_asiento} (${i.nombre_pasajero})`).join(', ') || 'Sin ítems'}
+                </td>
+                <td style="text-align: center;">
+                    <button onclick="vaciarCarroAdmin(${c.id})" class="btn-login" style="padding: 4px 8px; font-size: 0.75rem; color: red; border-color: red;">
+                        Vaciar
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function vaciarCarroAdmin(carroId) {
+        if (!confirm(`¿Vaciar el carro #${carroId}?`)) return;
+        const res = await BusdrexAPI.authFetch(`/api/admin/carros/?carro_id=${carroId}`, { method: 'DELETE' });
+        if (res.ok) loadAdminCarros();
+    }
+
+    // --------------------------------------------------------------------------
+    // 8. USUARIOS
+    // --------------------------------------------------------------------------
+    async function loadAdminUsuarios() {
+        const tbody = document.getElementById('adminUsuariosTbody');
+        const res = await BusdrexAPI.authFetch('/api/admin/usuarios/');
+        const data = await res.json();
+        const list = data.results || data;
+
+        tbody.innerHTML = list.map(u => `
+            <tr>
+                <td><strong>#${u.id}</strong></td>
+                <td><strong>${u.username}</strong></td>
+                <td>${u.first_name} ${u.last_name}</td>
+                <td>${u.telefono || '-'}</td>
+                <td>${u.email}</td>
+                <td><span class="badge ${u.rol === 'ADMIN_FLOTA' ? 'badge-cancelado' : 'badge-pagado'}">${u.rol_display}</span></td>
+                <td><span class="badge ${u.is_active ? 'badge-valido' : 'badge-anulado'}">${u.is_active ? 'Activo' : 'Inactivo'}</span></td>
+                <td style="text-align: center;">
+                    <button onclick="toggleUsuarioActivo(${u.id}, ${!u.is_active})" class="btn-login" style="padding: 4px 8px; font-size: 0.75rem;">
+                        ${u.is_active ? 'Desactivar' : 'Activar'}
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    async function toggleUsuarioActivo(userId, nuevoEstado) {
+        if (!confirm(`¿Deseas cambiar el estado activo del usuario #${userId}?`)) return;
+        const res = await BusdrexAPI.authFetch(`/api/admin/usuarios/${userId}/`, {
+            method: 'PATCH',
+            body: JSON.stringify({ is_active: nuevoEstado })
+        });
+        if (res.ok) loadAdminUsuarios();
+    }
+
+    // Función auxiliar para eliminación genérica con manejo de ProtectedError (HTTP 409)
+    async function eliminarRecurso(url, reloadCallback) {
+        if (!confirm('¿Confirmas la eliminación de este registro?')) return;
+        const res = await BusdrexAPI.authFetch(url, { method: 'DELETE' });
+        if (res.ok) {
+            reloadCallback();
+        } else if (res.status === 409) {
+            const err = await res.json();
+            alert(`[ERROR 409 - CONFLICTO DE INTEGRIDAD]\n\n${err.detalle || err.error || 'No es posible eliminar el registro porque tiene datos activos relacionados.'}`);
+        } else {
+            alert('No fue posible eliminar el registro.');
+        }
+    }
+
+    // Carga inicial
+    loadAdminServicios();
+</script>
+{% endblock %}

@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Iniciar Sesión - BusDrex{% endblock %}
+
+{% block content %}
+<div class="section-container" style="max-width: 480px; margin-top: 50px; margin-bottom: 70px;">
+    <div class="search-card" style="padding: 32px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div class="logo-icon" style="margin: 0 auto 12px; width: 50px; height: 50px; font-size: 1.6rem;">B</div>
+            <h2 style="color: #00264d; font-size: 1.6rem; font-weight: 800;">Iniciar Sesión</h2>
+            <p style="color: #64748b; font-size: 0.9rem; margin-top: 4px;">Accede a tu cuenta de Pasajero o Administrador</p>
+        </div>
+
+        <div id="loginErrorAlert" style="display: none; background: #fee2e2; border-left: 4px solid #e62629; color: #b91c1c; padding: 12px; border-radius: 4px; margin-bottom: 18px; font-size: 0.88rem;"></div>
+
+        <form onsubmit="handleLoginSubmit(event)">
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label for="loginUsername">Usuario</label>
+                <input type="text" id="loginUsername" class="form-control" placeholder="Ej. pasajero_demo o admin_flota" required autofocus>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 24px;">
+                <label for="loginPassword">Contraseña</label>
+                <input type="password" id="loginPassword" class="form-control" placeholder="Tu contraseña" required>
+            </div>
+
+            <button type="submit" id="btnLoginSubmit" class="btn-search" style="width: 100%; justify-content: center; height: 48px;">
+                Ingresar a BusDrex
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid #f1f5f9; font-size: 0.9rem; color: #64748b;">
+            ¿Aún no tienes cuenta?
+            <a href="/registro/" style="color: #0066cc; font-weight: 700; text-decoration: none;">Regístrate como Pasajero</a>
+        </div>
+
+        <!-- Credenciales de Demostración para Evaluación Académica -->
+        <div style="margin-top: 20px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 12px; font-size: 0.8rem; color: #475569;">
+            <strong style="color: #0066cc;">💡 Accesos de Demostración:</strong>
+            <div style="margin-top: 4px;">• <strong>Admin Flota:</strong> <code>admin_flota</code> / <code>Admin1234!</code></div>
+            <div>• <strong>Pasajero Demo:</strong> <code>pasajero_demo</code> / <code>Pasajero1234!</code></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function handleLoginSubmit(event) {
+        event.preventDefault();
+        const usernameInput = document.getElementById('loginUsername');
+        const passwordInput = document.getElementById('loginPassword');
+        const errorAlert = document.getElementById('loginErrorAlert');
+        const submitBtn = document.getElementById('btnLoginSubmit');
+
+        errorAlert.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Verificando credenciales...';
+
+        try {
+            const response = await fetch('/api/auth/login/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: usernameInput.value.trim(),
+                    password: passwordInput.value
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Guardar tokens y datos de usuario en localStorage
+                BusdrexAPI.saveSession(data.access, data.refresh, data.usuario);
+
+                // Manejar redirección 'next'
+                const urlParams = new URLSearchParams(window.location.search);
+                const nextUrl = urlParams.get('next');
+
+                if (nextUrl) {
+                    window.location.href = nextUrl;
+                } else if (data.usuario?.rol === 'ADMIN_FLOTA' || data.usuario?.is_admin_flota) {
+                    window.location.href = '/panel/';
+                } else {
+                    window.location.href = '/';
+                }
+            } else {
+                errorAlert.textContent = data.detail || 'Usuario o contraseña incorrectos. Por favor intente nuevamente.';
+                errorAlert.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = 'Ingresar a BusDrex';
+            }
+        } catch (err) {
+            errorAlert.textContent = 'Error de conexión con el servidor. Intente más tarde.';
+            errorAlert.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Ingresar a BusDrex';
+        }
+    }
+</script>
+{% endblock %}

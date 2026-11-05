@@ -1,0 +1,26 @@
+# ==============================================================================
+# BUSDREX - REQUISITOS DEL SISTEMA (EVALUACIÓN 2: PROGRAMACIÓN BACK END)
+# Estudiante: Benjamin Gómez | Sección: AP-N4-C1 | Año: 2026
+# Proyecto 4: Reservas de Pasajes de Buses Interurbanos (Inspirado en Turbus)
+# ==============================================================================
+
+# Framework Web y ORM
+Django>=5.0,<7.0
+
+# Django REST Framework y Extensiones
+djangorestframework>=3.14.0
+djangorestframework-simplejwt>=5.3.0
+django-filter>=24.0
+
+# Documentación OpenAPI / Swagger
+drf-spectacular>=0.27.0
+
+# Conectores de Base de Datos MySQL / MariaDB (custom_mysql)
+pymysql>=1.1.0
+cryptography>=42.0.0
+
+# Configuración y Variables de Entorno
+python-dotenv>=1.0.0
+
+# Soporte de CORS para clientes web (Frontend / Templates / Fetch API)
+django-cors-headers>=4.3.0

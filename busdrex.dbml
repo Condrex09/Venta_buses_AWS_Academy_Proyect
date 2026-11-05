@@ -1,0 +1,209 @@
+// =============================================================================
+// BUSDREX - MODELO DE DATOS EN TERCERA FORMA NORMAL (3FN)
+// Proyecto 4: Reservas de Pasajes de Buses Interurbanos
+// Alumno: Benjamin Gómez | Sección: AP-N4-C1 | Año: 2026
+// Pegar en https://dbdiagram.io/d  (Import / panel izquierdo)
+// =============================================================================
+
+Project busdrex {
+  database_type: 'MySQL'
+  Note: 'BusDrex - modelo relacional en 3FN'
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS (campos con CHOICES)
+// -----------------------------------------------------------------------------
+Enum rol_usuario {
+  PASAJERO
+  ADMIN_FLOTA
+}
+
+Enum tipo_bus {
+  SEMICAMA
+  SALON_CAMA
+  PREMIUM
+}
+
+Enum tipo_asiento {
+  SEMICAMA
+  CAMA
+}
+
+Enum estado_asiento {
+  DISPONIBLE
+  OCUPADO
+}
+
+Enum estado_venta {
+  PENDIENTE
+  PAGADO
+  ENTREGADO
+  CANCELADO
+}
+
+Enum estado_boleto {
+  VALIDO
+  ANULADO
+}
+
+// -----------------------------------------------------------------------------
+// 1. USUARIOS Y ROLES
+// -----------------------------------------------------------------------------
+Table usuario {
+  id integer [pk, increment]
+  username varchar(150) [not null, unique]
+  email varchar(254)
+  password varchar(128) [not null, note: 'Hash, nunca texto plano']
+  first_name varchar(150)
+  last_name varchar(150)
+  telefono varchar(20)
+  rol rol_usuario [not null, default: 'PASAJERO']
+  is_active boolean [not null, default: true]
+  date_joined datetime [not null]
+}
+
+// Datos del ocupante del asiento: el nombre depende del RUT, por eso va aparte (3FN)
+Table pasajero {
+  id integer [pk, increment]
+  rut varchar(20) [not null, unique, note: 'RUT o pasaporte']
+  nombre_completo varchar(150) [not null]
+}
+
+// -----------------------------------------------------------------------------
+// 2. GEOGRAFÍA: región -> ciudad -> terminal (evita dependencias transitivas)
+// -----------------------------------------------------------------------------
+Table region {
+  id integer [pk, increment]
+  nombre varchar(100) [not null, unique]
+}
+
+Table ciudad {
+  id integer [pk, increment]
+  nombre varchar(100) [not null]
+  region_id integer [not null, ref: > region.id]
+
+  indexes {
+    (nombre, region_id) [unique]
+  }
+}
+
+Table terminal {
+  id integer [pk, increment]
+  nombre varchar(150) [not null]
+  ciudad_id integer [not null, ref: > ciudad.id]
+
+  indexes {
+    (nombre, ciudad_id) [unique]
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 3. TRANSPORTE: ruta, bus, servicio, asiento
+// -----------------------------------------------------------------------------
+Table ruta {
+  id integer [pk, increment]
+  origen_id integer [not null, ref: > terminal.id]
+  destino_id integer [not null, ref: > terminal.id]
+  duracion_minutos integer [not null]
+
+  indexes {
+    (origen_id, destino_id) [unique]
+  }
+  Note: 'origen_id debe ser distinto de destino_id (validación en clean())'
+}
+
+Table bus {
+  id integer [pk, increment]
+  patente varchar(10) [not null, unique]
+  modelo varchar(100) [not null]
+  capacidad_total integer [not null]
+  tipo_bus tipo_bus [not null, default: 'SEMICAMA']
+}
+
+Table servicio {
+  id integer [pk, increment]
+  ruta_id integer [not null, ref: > ruta.id]
+  bus_id integer [not null, ref: > bus.id]
+  fecha_hora_salida datetime [not null]
+  tarifa_semicama decimal(10,2) [not null]
+  tarifa_cama decimal(10,2) [not null]
+}
+
+Table asiento {
+  id integer [pk, increment]
+  servicio_id integer [not null, ref: > servicio.id]
+  numero_asiento integer [not null]
+  tipo_asiento tipo_asiento [not null]
+  estado estado_asiento [not null, default: 'DISPONIBLE']
+
+  indexes {
+    (servicio_id, numero_asiento) [unique]
+  }
+  Note: 'El stock vive aquí: pasa a OCUPADO solo cuando la venta se paga'
+}
+
+// -----------------------------------------------------------------------------
+// 4. CARRO PERSISTENTE (1 a 1 con el usuario)
+// -----------------------------------------------------------------------------
+Table carro_pasajes {
+  id integer [pk, increment]
+  usuario_id integer [not null, unique, ref: - usuario.id, note: 'Relación 1 a 1']
+  fecha_creacion datetime [not null]
+  fecha_actualizacion datetime [not null]
+}
+
+Table item_carro {
+  id integer [pk, increment]
+  carro_id integer [not null, ref: > carro_pasajes.id]
+  asiento_id integer [not null, ref: > asiento.id]
+  pasajero_id integer [not null, ref: > pasajero.id]
+  fecha_agregado datetime [not null]
+
+  indexes {
+    (carro_id, asiento_id) [unique]
+  }
+  Note: 'Sin precio: se calcula desde servicio.tarifa_* según asiento.tipo_asiento'
+}
+
+// -----------------------------------------------------------------------------
+// 5. VENTAS (ORDEN HISTÓRICA), DETALLE Y BOLETOS
+// -----------------------------------------------------------------------------
+Table venta {
+  id integer [pk, increment]
+  usuario_id integer [not null, ref: > usuario.id]
+  codigo_transaccion char(36) [not null, unique, note: 'UUID']
+  estado estado_venta [not null, default: 'PENDIENTE']
+  total decimal(12,2) [not null, note: 'Snapshot del total al hacer checkout']
+  fecha_creacion datetime [not null]
+}
+
+Table detalle_venta {
+  id integer [pk, increment]
+  venta_id integer [not null, ref: > venta.id]
+  asiento_id integer [not null, ref: > asiento.id]
+  pasajero_id integer [not null, ref: > pasajero.id]
+  precio_unitario decimal(10,2) [not null, note: 'Precio congelado al checkout']
+}
+
+Table boleto {
+  id integer [pk, increment]
+  detalle_venta_id integer [not null, unique, ref: - detalle_venta.id, note: 'Relación 1 a 1']
+  codigo_boleto char(36) [not null, unique, note: 'UUID']
+  codigo_hash char(64) [not null, note: 'SHA-256']
+  estado estado_boleto [not null, default: 'VALIDO']
+  fecha_emision datetime [not null]
+}
+
+// -----------------------------------------------------------------------------
+// 6. OFERTAS (banners del home, administradas por el admin)
+// -----------------------------------------------------------------------------
+Table oferta {
+  id integer [pk, increment]
+  ruta_id integer [ref: > ruta.id, note: 'Opcional: oferta general si es nulo']
+  titulo varchar(150) [not null]
+  descripcion text
+  descuento_porcentaje decimal(5,2) [not null]
+  fecha_inicio date [not null]
+  fecha_fin date [not null]
+  activa boolean [not null, default: true]
+}

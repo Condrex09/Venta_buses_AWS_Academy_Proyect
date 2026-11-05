@@ -1,0 +1,326 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Resultados de Búsqueda de Pasajes - BusDrex{% endblock %}
+
+{% block content %}
+<div class="search-results-layout">
+    <!-- Filtros Laterales (django-filter en API) -->
+    <aside class="filters-sidebar">
+        <h3 class="filters-title">Filtros de Búsqueda</h3>
+
+        <form id="filterForm" onsubmit="applyFilters(event)">
+
+            <!-- ======================================================
+                 GRUPO 1: TIPO DE BUS (se muestra primero)
+                 Valores: SEMICAMA | SALON_CAMA | PREMIUM
+                 ====================================================== -->
+            <div class="filter-group">
+                <h4>Tipo de Bus</h4>
+                <label class="checkbox-label">
+                    <input type="radio" name="tipo_bus" value="" checked onchange="handleTipoBusChange()">
+                    Todos los buses
+                </label>
+                <label class="checkbox-label">
+                    <input type="radio" name="tipo_bus" value="SEMICAMA" onchange="handleTipoBusChange()">
+                    🚌 Bus Semicama
+                </label>
+                <label class="checkbox-label">
+                    <input type="radio" name="tipo_bus" value="SALON_CAMA" onchange="handleTipoBusChange()">
+                    🛏️ Bus Salón Cama
+                </label>
+                <label class="checkbox-label">
+                    <input type="radio" name="tipo_bus" value="PREMIUM" onchange="handleTipoBusChange()">
+                    ⭐ Bus Premium
+                </label>
+            </div>
+
+            <!-- ======================================================
+                 GRUPO 2: TIPO DE ASIENTO / CONFORT
+                 Opciones imposibles se deshabilitan según tipo_bus.
+                 ====================================================== -->
+            <div class="filter-group">
+                <h4>Tipo de Asiento / Confort</h4>
+                <label class="checkbox-label" id="lbl_asiento_todos">
+                    <input type="radio" name="tipo_asiento" value="" id="radio_asiento_todos" checked onchange="applyFilters()">
+                    Todos los tipos
+                </label>
+                <label class="checkbox-label" id="lbl_asiento_semicama">
+                    <input type="radio" name="tipo_asiento" value="SEMICAMA" id="radio_asiento_semicama" onchange="applyFilters()">
+                    Semicama
+                </label>
+                <label class="checkbox-label" id="lbl_asiento_cama">
+                    <input type="radio" name="tipo_asiento" value="CAMA" id="radio_asiento_cama" onchange="applyFilters()">
+                    Salón Cama
+                </label>
+                <p id="asiento_hint" style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px; display: none;">
+                    Combinación sin resultados: este tipo de asiento no existe en el bus seleccionado.
+                </p>
+            </div>
+
+            <!-- RANGO DE TARIFA -->
+            <div class="filter-group">
+                <h4>Rango de Tarifa (CLP)</h4>
+                <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+                    <input type="number" id="tarifaMin" class="form-control" placeholder="Mínimo" style="padding: 8px;" onchange="applyFilters()">
+                    <input type="number" id="tarifaMax" class="form-control" placeholder="Máximo" style="padding: 8px;" onchange="applyFilters()">
+                </div>
+            </div>
+
+            <!-- DISPONIBILIDAD -->
+            <div class="filter-group">
+                <h4>Disponibilidad</h4>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="soloDisponibles" checked onchange="applyFilters()">
+                    Solo con asientos libres
+                </label>
+                <label class="checkbox-label">
+                    <input type="checkbox" id="soloFuturos" checked onchange="applyFilters()">
+                    Solo salidas futuras
+                </label>
+            </div>
+
+            <button type="button" class="btn-login" style="width: 100%; padding: 10px; cursor: pointer;" onclick="resetFilters()">
+                Limpiar Filtros
+            </button>
+        </form>
+    </aside>
+
+    <!-- Lista de Resultados de Servicios -->
+    <section>
+        <div style="background: white; border-radius: 8px; padding: 16px 20px; margin-bottom: 20px; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center;">
+            <h2 id="searchSummaryTitle" style="font-size: 1.2rem; color: #00264d; font-weight: 800;">
+                Servicios Disponibles
+            </h2>
+            <span id="resultsCountBadge" class="badge badge-pagado" style="font-size: 0.85rem;">0 viajes</span>
+        </div>
+
+        <div class="results-list" id="servicesList">
+            <div style="text-align: center; padding: 50px; background: white; border-radius: 8px;">
+                Cargando itinerarios disponibles desde el servidor...
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ===========================================================================
+    // ETIQUETAS Y ESTILOS CENTRALIZADOS PARA TIPO DE BUS
+    // Fuente unica de verdad: cambiar aqui afecta tarjetas, badges y hints.
+    // ===========================================================================
+    const TIPO_BUS_CONFIG = {
+        'SEMICAMA':   { label: 'Bus Semicama',   color: '#0284c7', bg: '#e0f2fe' },
+        'SALON_CAMA': { label: 'Bus Salón Cama', color: '#1e40af', bg: '#dbeafe' },
+        'PREMIUM':    { label: 'Bus Premium',    color: '#92400e', bg: '#fef3c7' },
+    };
+
+    // Obtiene el badge HTML para el tipo de bus de un servicio.
+    function getBusBadge(tipoBus) {
+        const cfg = TIPO_BUS_CONFIG[tipoBus];
+        if (!cfg) return `<span class="bus-badge">${tipoBus}</span>`;
+        return `<span class="bus-badge" style="background:${cfg.bg}; color:${cfg.color}; border:1px solid ${cfg.color}33;">${cfg.label}</span>`;
+    }
+
+    // ===========================================================================
+    // REGLA DE COMBINACION tipo_bus + tipo_asiento (para hints en el front):
+    // - Bus SEMICAMA   -> solo asientos SEMICAMA. SEMICAMA + CAMA = 0 resultados.
+    // - Bus SALON_CAMA -> solo asientos CAMA.     SALON_CAMA + SEMICAMA = 0 resultados.
+    // - Bus PREMIUM    -> ambos tipos. PREMIUM + CAMA = solo Premium con CAMA disponibles.
+    // ===========================================================================
+
+    // Mapa de asientos compatibles por tipo de bus
+    const ASIENTOS_COMPATIBLES = {
+        'SEMICAMA':   ['SEMICAMA'],
+        'SALON_CAMA': ['CAMA'],
+        'PREMIUM':    ['SEMICAMA', 'CAMA'],
+        '':           ['SEMICAMA', 'CAMA'],  // Todos los buses
+    };
+
+    // Leer parametros iniciales desde la URL (para compartir enlace y recargar)
+    const urlParams = new URLSearchParams(window.location.search);
+    const searchOrigen  = urlParams.get('origen') || '';
+    const searchDestino = urlParams.get('destino') || '';
+    const searchFecha   = urlParams.get('fecha') || '';
+    const initTipoBus   = urlParams.get('tipo_bus') || '';
+    const initTipoAsiento = urlParams.get('tipo_asiento') || '';
+
+    // Restaurar estado de los radios desde la URL al cargar la pagina
+    (function restoreFiltersFromURL() {
+        if (initTipoBus) {
+            const radio = document.querySelector(`input[name="tipo_bus"][value="${initTipoBus}"]`);
+            if (radio) radio.checked = true;
+        }
+        if (initTipoAsiento) {
+            const radio = document.querySelector(`input[name="tipo_asiento"][value="${initTipoAsiento}"]`);
+            if (radio) radio.checked = true;
+        }
+        // Actualizar hints segun tipo_bus inicial
+        updateAsientoHints(initTipoBus);
+    })();
+
+    // Deshabilita/habilita opciones de asiento segun tipo de bus seleccionado
+    function updateAsientoHints(tipoBus) {
+        const compatibles = ASIENTOS_COMPATIBLES[tipoBus] || ['SEMICAMA', 'CAMA'];
+        const hint = document.getElementById('asiento_hint');
+        let hayOpcionImposible = false;
+
+        ['SEMICAMA', 'CAMA'].forEach(tipo => {
+            const radio = document.getElementById(`radio_asiento_${tipo.toLowerCase() === 'cama' ? 'cama' : 'semicama'}`);
+            const lbl   = document.getElementById(`lbl_asiento_${tipo.toLowerCase() === 'cama' ? 'cama' : 'semicama'}`);
+            if (!radio) return;
+            const esCompatible = compatibles.includes(tipo);
+            radio.disabled = !esCompatible;
+            if (lbl) lbl.style.opacity = esCompatible ? '1' : '0.35';
+            if (!esCompatible && radio.checked) {
+                // Si el asiento seleccionado ya no es compatible, volvemos a 'Todos'
+                document.getElementById('radio_asiento_todos').checked = true;
+                hayOpcionImposible = true;
+            }
+            if (!esCompatible) hayOpcionImposible = true;
+        });
+        if (hint) hint.style.display = (tipoBus && hayOpcionImposible) ? 'block' : 'none';
+    }
+
+    // Manejador de cambio en tipo_bus: actualiza hints y aplica filtros
+    function handleTipoBusChange() {
+        const tipoBus = document.querySelector('input[name="tipo_bus"]:checked')?.value || '';
+        updateAsientoHints(tipoBus);
+        applyFilters();
+    }
+
+    // Construye los parametros y llama a la API; guarda filtros en la URL
+    async function fetchServices() {
+        const listContainer = document.getElementById('servicesList');
+        const countBadge    = document.getElementById('resultsCountBadge');
+        const summaryTitle  = document.getElementById('searchSummaryTitle');
+
+        if (searchOrigen || searchDestino) {
+            summaryTitle.textContent = `Viajes de ${searchOrigen || 'Cualquier Origen'} a ${searchDestino || 'Cualquier Destino'} ${searchFecha ? '(' + searchFecha + ')' : ''}`;
+        }
+
+        // Leer valores actuales de los filtros
+        const tipoBus    = document.querySelector('input[name="tipo_bus"]:checked')?.value || '';
+        const tipoAsiento = document.querySelector('input[name="tipo_asiento"]:checked')?.value || '';
+
+        // Actualizar la URL para que sea compartible (sin recargar la pagina)
+        const currentUrl = new URL(window.location.href);
+        if (tipoBus)    currentUrl.searchParams.set('tipo_bus', tipoBus);
+        else            currentUrl.searchParams.delete('tipo_bus');
+        if (tipoAsiento) currentUrl.searchParams.set('tipo_asiento', tipoAsiento);
+        else             currentUrl.searchParams.delete('tipo_asiento');
+        window.history.replaceState({}, '', currentUrl.toString());
+
+        // Construir params para la API
+        const params = new URLSearchParams();
+        if (searchOrigen)  params.append('origen_ciudad', searchOrigen);
+        if (searchDestino) params.append('destino_ciudad', searchDestino);
+        if (searchFecha)   params.append('fecha_salida', searchFecha);
+        if (tipoBus)       params.append('tipo_bus', tipoBus);
+        if (tipoAsiento)   params.append('tipo_asiento', tipoAsiento);
+
+        const tarifaMin = document.getElementById('tarifaMin').value;
+        if (tarifaMin) params.append('tarifa_minima', tarifaMin);
+        const tarifaMax = document.getElementById('tarifaMax').value;
+        if (tarifaMax) params.append('tarifa_maxima', tarifaMax);
+
+        if (document.getElementById('soloDisponibles').checked) params.append('solo_disponibles', 'true');
+        if (document.getElementById('soloFuturos').checked)     params.append('solo_futuros', 'true');
+
+        try {
+            const res = await fetch(`/api/servicios/buscar/?${params.toString()}`);
+            if (!res.ok) {
+                // Error 400 u otro del servidor
+                const errData = await res.json().catch(() => ({}));
+                listContainer.innerHTML = `<div style="text-align: center; color: #e62629; padding: 40px; background: white; border-radius: 8px;">
+                    Error de filtros: ${errData.error || 'Parámetro inválido. Usa Limpiar Filtros.'}</div>`;
+                countBadge.textContent = '0 viajes';
+                return;
+            }
+            const data = await res.json();
+            const servicios = data.results || data;
+
+            // Contador real
+            countBadge.textContent = `${servicios.length} viaje${servicios.length !== 1 ? 's' : ''} encontrado${servicios.length !== 1 ? 's' : ''}`;
+
+            if (!servicios || servicios.length === 0) {
+                // Mostrar estado vacio con boton limpiar
+                const isCombinacionImposible = tipoBus && tipoAsiento;
+                listContainer.innerHTML = `
+                    <div style="text-align: center; padding: 50px; background: white; border-radius: 8px; border: 1px solid #e2e8f0;">
+                        <h3 style="color: #64748b; margin-bottom: 10px;">No encontramos viajes para los criterios seleccionados</h3>
+                        <p style="color: #94a3b8; font-size: 0.9rem;">
+                            ${isCombinacionImposible
+                                ? `La combinación <strong>${TIPO_BUS_CONFIG[tipoBus]?.label || tipoBus}</strong> + asiento <strong>${tipoAsiento === 'CAMA' ? 'Salón Cama' : 'Semicama'}</strong> puede no tener asientos disponibles. Prueba quitando uno de los filtros.`
+                                : 'Prueba modificando las fechas o quitando filtros de precio y tipo de asiento.'}
+                        </p>
+                        <button onclick="resetFilters()" class="btn-register" style="display: inline-block; margin-top: 15px;">Limpiar Filtros</button>
+                    </div>
+                `;
+                return;
+            }
+
+            listContainer.innerHTML = servicios.map(s => {
+                const fechaObj   = new Date(s.fecha_hora_salida);
+                const horaSalida = fechaObj.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+                const fechaFormato = fechaObj.toLocaleDateString('es-CL', { weekday: 'short', day: 'numeric', month: 'short' });
+
+                return `
+                    <div class="service-card">
+                        <div>
+                            <div class="service-time">${horaSalida} hrs</div>
+                            <div class="service-duration">Salida: ${fechaFormato} | Duración: ${s.ruta.duracion_formateada || (s.ruta.duracion_minutos ? s.ruta.duracion_minutos + ' min' : 'Directo')}</div>
+                            ${getBusBadge(s.bus.tipo_bus)}
+                        </div>
+
+                        <div>
+                            <div class="service-route">${s.ruta.origen.ciudad_nombre || s.ruta.origen.ciudad} ➔ ${s.ruta.destino.ciudad_nombre || s.ruta.destino.ciudad}</div>
+                            <div class="service-terminal">${s.ruta.origen.nombre} ➔ ${s.ruta.destino.nombre}</div>
+                            <div style="font-size: 0.78rem; color: #64748b; margin-top: 4px;">Bus: ${s.bus.modelo} (${s.bus.patente})</div>
+                        </div>
+
+                        <div class="service-pricing">
+                            <div class="price-title">Precios por tipo:</div>
+                            <div style="font-size: 0.85rem; font-weight: 700; color: #0284c7;">Semicama: $${parseInt(s.tarifa_semicama).toLocaleString('es-CL')}</div>
+                            <div style="font-size: 0.85rem; font-weight: 700; color: #1e40af;">Salón Cama: $${parseInt(s.tarifa_cama).toLocaleString('es-CL')}</div>
+                            <div class="seats-avail">🟢 ${s.asientos_disponibles} asientos disponibles</div>
+                        </div>
+
+                        <div>
+                            <a href="/asientos/${s.id}/" class="btn-select-service">Elegir Asientos</a>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            listContainer.innerHTML = `<div style="text-align: center; color: #e62629; padding: 40px; background: white; border-radius: 8px;">Error al consultar servicios: ${e.message}</div>`;
+        }
+    }
+
+    function applyFilters(event) {
+        if (event) event.preventDefault();
+        fetchServices();
+    }
+
+    function resetFilters() {
+        // Restablecer ambos grupos de radios
+        document.querySelectorAll('input[name="tipo_bus"]')[0].checked    = true;
+        document.querySelectorAll('input[name="tipo_asiento"]')[0].checked = true;
+        document.getElementById('tarifaMin').value = '';
+        document.getElementById('tarifaMax').value = '';
+        document.getElementById('soloDisponibles').checked = false;
+        document.getElementById('soloFuturos').checked     = true;
+        updateAsientoHints('');
+        // Limpiar tipo_bus y tipo_asiento de la URL
+        const currentUrl = new URL(window.location.href);
+        currentUrl.searchParams.delete('tipo_bus');
+        currentUrl.searchParams.delete('tipo_asiento');
+        window.history.replaceState({}, '', currentUrl.toString());
+        fetchServices();
+    }
+
+    fetchServices();
+</script>
+
+{% endblock %}

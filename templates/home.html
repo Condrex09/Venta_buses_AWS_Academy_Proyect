@@ -1,0 +1,218 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BusDrex - Compra de Pasajes de Buses Interurbanos | Estilo Turbus.cl{% endblock %}
+
+{% block content %}
+<!-- Sección Hero con Buscador "¿Dónde estás?" -->
+<section class="hero-section">
+    <div class="hero-content">
+        <h1 class="hero-title">Viaja cómodo y seguro por todo Chile</h1>
+        <p class="hero-subtitle">Encuentra tus pasajes al mejor precio en buses Salón Cama y Semicama con BusDrex</p>
+
+        <!-- Tarjeta de Búsqueda Estilo Turbus -->
+        <div class="search-card">
+            <div class="search-card-header">
+                <span style="font-size: 1.5rem;">📍</span>
+                <h2>¿Dónde estás?</h2>
+            </div>
+
+            <form id="searchForm" onsubmit="handleSearch(event)">
+                <div class="search-grid">
+                    <!-- Origen -->
+                    <div class="form-group">
+                        <label for="origenInput">Origen</label>
+                        <input type="text" id="origenInput" class="form-control" placeholder="Ciudad de origen (ej. Santiago)" list="ciudadesList" required>
+                    </div>
+
+                    <!-- Botón Intercambiar -->
+                    <div style="display: flex; justify-content: center;">
+                        <button type="button" class="btn-swap" onclick="swapCities()" title="Invertir origen y destino">
+                            ⇄
+                        </button>
+                    </div>
+
+                    <!-- Destino -->
+                    <div class="form-group">
+                        <label for="destinoInput">Destino</label>
+                        <input type="text" id="destinoInput" class="form-control" placeholder="Ciudad de destino (ej. Temuco)" list="ciudadesList" required>
+                    </div>
+
+                    <!-- Fecha de Ida -->
+                    <div class="form-group">
+                        <label for="fechaIdaInput">Fecha de Ida</label>
+                        <input type="date" id="fechaIdaInput" class="form-control" required>
+                    </div>
+
+                    <!-- Fecha de Vuelta (Opcional) -->
+                    <div class="form-group">
+                        <label for="fechaVueltaInput">Fecha de Vuelta <span style="font-size: 0.75rem; color: #94a3b8;">(Opcional)</span></label>
+                        <input type="date" id="fechaVueltaInput" class="form-control">
+                    </div>
+
+                    <!-- Botón Buscar -->
+                    <div>
+                        <button type="submit" class="btn-search">
+                            🔍 Buscar
+                        </button>
+                    </div>
+                </div>
+            </form>
+
+            <datalist id="ciudadesList"></datalist>
+        </div>
+    </div>
+</section>
+
+<!-- Accesos Rápidos Estilo Turbus -->
+<section class="quick-access-section">
+    <div class="quick-access-grid">
+        <a href="#searchForm" class="quick-card" onclick="document.getElementById('origenInput').focus()">
+            <div class="quick-card-icon">🎟️</div>
+            <div class="quick-card-info">
+                <h3>Comprar Pasajes</h3>
+                <p>Elige tu asiento en línea fácilmente</p>
+            </div>
+        </a>
+
+        <a href="/mis-pasajes/" class="quick-card">
+            <div class="quick-card-icon">📋</div>
+            <div class="quick-card-info">
+                <h3>Mis Pasajes</h3>
+                <p>Revisa tus boletos y estado de órdenes</p>
+            </div>
+        </a>
+
+        <a href="#ofertasSection" class="quick-card">
+            <div class="quick-card-icon">🏷️</div>
+            <div class="quick-card-info">
+                <h3>Ofertas Especiales</h3>
+                <p>Descuentos exclusivos en rutas del país</p>
+            </div>
+        </a>
+
+        <a href="/buscar/" class="quick-card">
+            <div class="quick-card-icon">🚌</div>
+            <div class="quick-card-info">
+                <h3>Ver Todos los Servicios</h3>
+                <p>Itinerarios y salidas disponibles</p>
+            </div>
+        </a>
+    </div>
+</section>
+
+<!-- Sección de Ofertas y Promociones -->
+<section class="section-container" id="ofertasSection">
+    <div class="section-header">
+        <h2>Promociones y Ofertas Destacadas</h2>
+        <a href="/buscar/" style="color: #0066cc; font-weight: 700; text-decoration: none;">Ver todos los destinos →</a>
+    </div>
+
+    <div class="offers-grid" id="offersContainer">
+        <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: #64748b;">
+            Cargando ofertas activas desde el backend...
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Inicializar fecha mínima de hoy
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('fechaIdaInput').min = today;
+    document.getElementById('fechaIdaInput').value = today;
+
+    // Cargar ciudades para autocompletado desde la API (usa ciudad_nombre para texto legible)
+    async function loadCiudades() {
+        try {
+            const res = await fetch('/api/terminales/');
+            if (res.ok) {
+                const data = await res.json();
+                const terminales = data.results || data;
+                const datalist = document.getElementById('ciudadesList');
+                // ciudad_nombre es el string del nombre de la ciudad (3FN); ciudad sería el ID FK
+                const ciudadesUnicas = [...new Set(terminales.map(t => t.ciudad_nombre).filter(Boolean))];
+                datalist.innerHTML = ciudadesUnicas.map(c => `<option value="${c}">`).join('');
+            }
+        } catch (e) {
+            console.error('Error al cargar ciudades:', e);
+        }
+    }
+
+    // Intercambiar ciudades de origen y destino
+    function swapCities() {
+        const origen = document.getElementById('origenInput');
+        const destino = document.getElementById('destinoInput');
+        const temp = origen.value;
+        origen.value = destino.value;
+        destino.value = temp;
+    }
+
+    // Manejar el submit de la búsqueda
+    function handleSearch(event) {
+        event.preventDefault();
+        const origen = document.getElementById('origenInput').value.trim();
+        const destino = document.getElementById('destinoInput').value.trim();
+        const fechaIda = document.getElementById('fechaIdaInput').value;
+
+        // Validación: origen y destino no pueden ser iguales
+        if (origen && destino && origen.toLowerCase() === destino.toLowerCase()) {
+            alert('La ciudad de origen y destino no pueden ser la misma. Por favor selecciona destinos distintos.');
+            return;
+        }
+
+        const params = new URLSearchParams();
+        if (origen) params.append('origen', origen);
+        if (destino) params.append('destino', destino);
+        if (fechaIda) params.append('fecha', fechaIda);
+
+        window.location.href = `/buscar/?${params.toString()}`;
+    }
+
+    // Cargar ofertas dinámicas desde /api/ofertas/
+    async function loadOfertas() {
+        const container = document.getElementById('offersContainer');
+        try {
+            const res = await fetch('/api/ofertas/?activa=true');
+            if (res.ok) {
+                const data = await res.json();
+                const ofertas = data.results || data;
+
+                if (!ofertas || ofertas.length === 0) {
+                    container.innerHTML = `
+                        <div style="grid-column: 1 / -1; text-align: center; padding: 30px; background: white; border-radius: 8px;">
+                            No hay promociones activas en este momento. Consulta las rutas disponibles en nuestro buscador.
+                        </div>
+                    `;
+                    return;
+                }
+
+                container.innerHTML = ofertas.map(oferta => `
+                    <div class="offer-card">
+                        <div class="offer-body">
+                            ${oferta.descuento_porcentaje > 0 ? `<span class="offer-badge">${oferta.descuento_porcentaje}% OFF</span>` : ''}
+                            <h3 class="offer-title">${oferta.titulo}</h3>
+                            <p class="offer-desc">${oferta.descripcion}</p>
+                            ${oferta.ruta_display ? `<p style="font-size: 0.8rem; color: #0066cc; font-weight: 600; margin-bottom: 10px;">📍 Ruta: ${oferta.ruta_display}</p>` : ''}
+                            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto;">
+                                <div>
+                                    ${oferta.precio_desde ? `<div class="offer-price-tag"><span>Desde</span> $${parseInt(oferta.precio_desde).toLocaleString('es-CL')}</div>` : ''}
+                                </div>
+                                <a href="/buscar/${oferta.ruta_display ? `?destino=${encodeURIComponent(oferta.ruta_display.split('->')[1]?.trim() || '')}` : ''}" class="btn-select-service" style="padding: 6px 14px; font-size: 0.82rem;">
+                                    Aprovechar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        } catch (e) {
+            container.innerHTML = `<div style="grid-column: 1 / -1; color: #e62629; text-align: center;">Error al cargar ofertas.</div>`;
+        }
+    }
+
+    loadCiudades();
+    loadOfertas();
+</script>
+{% endblock %}

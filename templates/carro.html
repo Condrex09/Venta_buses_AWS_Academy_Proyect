@@ -1,0 +1,171 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Mi Carro de Pasajes - BusDrex{% endblock %}
+
+{% block content %}
+<div class="section-container">
+    <div class="section-header">
+        <h2>Mi Carro de Pasajes</h2>
+        <a href="/buscar/" style="color: #0066cc; font-weight: 600; text-decoration: none;">+ Agregar más pasajes</a>
+    </div>
+
+    <div id="cartLoadingMessage" style="text-align: center; padding: 40px; background: white; border-radius: 8px;">
+        Cargando pasajes en su carro de compras...
+    </div>
+
+    <div id="cartContentWrapper" style="display: none;">
+        <div class="table-responsive">
+            <table class="styled-table">
+                <thead>
+                    <tr>
+                        <th>Servicio / Ruta</th>
+                        <th>Fecha y Hora</th>
+                        <th>Asiento</th>
+                        <th>Pasajero y RUT</th>
+                        <th>Precio</th>
+                        <th style="text-align: center;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="cartItemsTableBody">
+                    <!-- Se llena con JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="total-bar">
+            <div>
+                <button type="button" class="btn-login" style="color: #e62629; border-color: #e62629;" onclick="emptyCart()">
+                    🗑️ Vaciar Carro Completo
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 24px;">
+                <div style="text-align: right;">
+                    <div style="font-size: 0.85rem; color: #64748b;">Monto Total a Pagar:</div>
+                    <div class="total-amount" id="cartTotalDisplay">$0</div>
+                </div>
+                <a href="/pago/" class="btn-search" style="text-decoration: none; padding: 12px 28px;">
+                    💳 Continuar al Pago
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div id="cartEmptyMessage" style="display: none; text-align: center; padding: 60px 20px; background: white; border-radius: 8px; box-shadow: var(--shadow-sm); border: 1px solid #e2e8f0;">
+        <div style="font-size: 3rem; margin-bottom: 12px;">🛒</div>
+        <h3 style="color: #1e293b; margin-bottom: 8px;">Tu carro de pasajes está vacío</h3>
+        <p style="color: #64748b; font-size: 0.95rem; margin-bottom: 20px;">Explora los destinos disponibles en BusDrex y selecciona tus asientos favoritos.</p>
+        <a href="/buscar/" class="btn-register" style="display: inline-block;">Buscar Pasajes Ahora</a>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function loadCart() {
+        const loading = document.getElementById('cartLoadingMessage');
+        const content = document.getElementById('cartContentWrapper');
+        const emptyMsg = document.getElementById('cartEmptyMessage');
+        const tbody = document.getElementById('cartItemsTableBody');
+        const totalDisplay = document.getElementById('cartTotalDisplay');
+
+        // Validar que esté autenticado
+        if (!BusdrexAPI.getAccessToken()) {
+            window.location.href = `/login/?next=${encodeURIComponent(window.location.pathname)}`;
+            return;
+        }
+
+        try {
+            const res = await BusdrexAPI.authFetch('/api/carro-pasajes/');
+            if (!res.ok) {
+                loading.innerHTML = `<div style="color: #e62629;">Error al cargar el carro de compras.</div>`;
+                return;
+            }
+
+            const data = await res.json();
+            loading.style.display = 'none';
+
+            if (!data.items || data.items.length === 0) {
+                content.style.display = 'none';
+                emptyMsg.style.display = 'block';
+                return;
+            }
+
+            content.style.display = 'block';
+            emptyMsg.style.display = 'none';
+
+            tbody.innerHTML = data.items.map(item => {
+                const fechaObj = new Date(item.fecha_hora_salida);
+                const fechaStr = fechaObj.toLocaleDateString('es-CL', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const horaStr = fechaObj.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+                return `
+                    <tr>
+                        <td>
+                            <strong>${item.origen} ➔ ${item.destino}</strong>
+                            <div style="font-size: 0.8rem; color: #64748b;">${item.tipo_bus}</div>
+                        </td>
+                        <td>
+                            <div>${fechaStr}</div>
+                            <div style="font-size: 0.8rem; color: #64748b;">${horaStr} hrs</div>
+                        </td>
+                        <td>
+                            <span class="badge ${item.tipo_asiento === 'CAMA' ? 'badge-pagado' : 'badge-entregado'}">
+                                Asiento #${item.numero_asiento} (${item.tipo_asiento_display || item.tipo_asiento})
+                            </span>
+                        </td>
+                        <td>
+                            <strong>${item.nombre_pasajero}</strong>
+                            <div style="font-size: 0.8rem; color: #64748b;">RUT: ${item.rut_pasajero}</div>
+                        </td>
+                        <td style="font-weight: 700; color: #0066cc;">
+                            $${parseInt(item.precio_unitario).toLocaleString('es-CL')}
+                        </td>
+                        <td style="text-align: center;">
+                            <button type="button" onclick="removeItem(${item.id})" style="background: none; border: none; color: #e62629; cursor: pointer; font-size: 1.1rem;" title="Eliminar este pasaje">
+                                ❌
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            totalDisplay.textContent = `$${parseInt(data.total).toLocaleString('es-CL')}`;
+
+            // Actualizar badge en header
+            BusdrexAPI.updateCartCount();
+
+        } catch (e) {
+            loading.innerHTML = `<div style="color: #e62629;">Error: ${e.message}</div>`;
+        }
+    }
+
+    async function removeItem(itemId) {
+        if (!confirm('¿Deseas quitar este pasaje de tu carro?')) return;
+        try {
+            const res = await BusdrexAPI.authFetch(`/api/carro-pasajes/?item_id=${itemId}`, { method: 'DELETE' });
+            if (res.ok) {
+                loadCart();
+            } else {
+                alert('No fue posible eliminar el ítem.');
+            }
+        } catch (e) {
+            alert('Error de conexión.');
+        }
+    }
+
+    async function emptyCart() {
+        if (!confirm('¿Estás seguro de que deseas vaciar todo el carro de compras?')) return;
+        try {
+            const res = await BusdrexAPI.authFetch('/api/carro-pasajes/', { method: 'DELETE' });
+            if (res.ok) {
+                loadCart();
+            }
+        } catch (e) {
+            alert('Error de conexión.');
+        }
+    }
+
+    loadCart();
+</script>
+{% endblock %}

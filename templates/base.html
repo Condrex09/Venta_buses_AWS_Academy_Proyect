@@ -1,0 +1,116 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}BusDrex - Pasajes de Bus al Mejor Precio | Turbus.cl{% endblock %}</title>
+    <!-- Estilos Oficiales Turbus / BusDrex -->
+    <link rel="stylesheet" href="{% static 'css/turbus.css' %}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚌</text></svg>">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    <!-- Barra de Notificación Académica Institucional -->
+    <div class="top-notice-bar">
+        <span>🚌 Plataforma Oficial de Pasajes Interurbanos | Inspirado en Turbus.cl</span>
+        <span class="academic-badge">INACAP 2026 | Evaluación 2: Programación Back End | {{ STUDENT_NAME }} ({{ STUDENT_SECTION }})</span>
+    </div>
+
+    <!-- Encabezado Principal y Navegación -->
+    <header class="main-header">
+        <div class="nav-container">
+            <a href="/" class="logo-wrapper">
+                <div class="logo-icon">B</div>
+                <div class="logo-text">Bus<span>Drex</span></div>
+            </a>
+
+            <!-- Botón menú móvil -->
+            <button class="mobile-menu-btn" onclick="document.querySelector('.nav-links').classList.toggle('active')">
+                ☰
+            </button>
+
+            <!-- Enlaces de navegación -->
+            <ul class="nav-links">
+                <li><a href="/" class="{% if request.path == '/' %}active{% endif %}">Inicio</a></li>
+                <li><a href="/buscar/" class="{% if request.path == '/buscar/' %}active{% endif %}">Buscar Pasajes</a></li>
+                <li><a href="/mis-pasajes/" class="{% if request.path == '/mis-pasajes/' %}active{% endif %}">Mis Pasajes</a></li>
+                <!-- Enlaces exclusivos para Administrador de Flota (activados dinámicamente por JS) -->
+                <li class="admin-only-link" style="display: none;">
+                    <a href="/panel/" style="color: #e62629; font-weight: 700;">⚙️ Panel Flota</a>
+                </li>
+                <li class="admin-only-link" style="display: none;">
+                    <a href="/api/docs/" target="_blank" style="color: #0284c7; font-weight: 700;">📄 Swagger API</a>
+                </li>
+            </ul>
+
+            <!-- Área de Autenticación / Perfil / Carro -->
+            <div class="nav-auth" id="navAuthArea">
+                <a href="/login/" class="btn-login">Ingresar</a>
+                <a href="/registro/" class="btn-register">Registrarse</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Contenido Principal Dinámico -->
+    <main style="flex: 1;">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Botón Flotante de Contacto / Ayuda -->
+    <a href="https://wa.me/56912345678" target="_blank" class="floating-contact-btn" title="Ayuda al Pasajero en WhatsApp">
+        💬
+    </a>
+
+    <!-- Pie de Página Turbus.cl -->
+    <footer class="main-footer">
+        <div class="footer-container">
+            <div class="footer-col">
+                <h4>Sobre BusDrex</h4>
+                <p>Plataforma líder en gestión y reserva de pasajes de buses interurbanos para todo Chile, inspirada en los más altos estándares de calidad, seguridad y puntualidad de Turbus.cl.</p>
+            </div>
+            <div class="footer-col">
+                <h4>Principales Destinos</h4>
+                <ul>
+                    <li><a href="/buscar/?destino=Santiago">Santiago de Chile</a></li>
+                    <li><a href="/buscar/?destino=Viña del Mar">Viña del Mar y Valparaíso</a></li>
+                    <li><a href="/buscar/?destino=Concepción">Concepción (Biobío)</a></li>
+                    <li><a href="/buscar/?destino=Temuco">Temuco (La Araucanía)</a></li>
+                    <li><a href="/buscar/?destino=Puerto Montt">Puerto Montt y Osorno</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Servicio al Pasajero</h4>
+                <ul>
+                    <li><a href="/mis-pasajes/">Reimpresión de Boletos</a></li>
+                    <li><a href="/mis-pasajes/">Cancelación de Órdenes</a></li>
+                    <li><a href="#">Políticas de Equipaje</a></li>
+                    <li><a href="#">Preguntas Frecuentes</a></li>
+                </ul>
+            </div>
+            <div class="footer-col">
+                <h4>Ficha de Evaluación</h4>
+                <ul>
+                    <li><strong>Asignatura:</strong> Programación Back End</li>
+                    <li><strong>Evaluación:</strong> Evaluación 2 (MySQL + DRF)</li>
+                    <li><strong>Estudiante:</strong> {{ STUDENT_NAME }}</li>
+                    <li><strong>Sección:</strong> {{ STUDENT_SECTION }}</li>
+                    <li><strong>Año Académico:</strong> {{ STUDENT_YEAR }}</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Línea institucional permanente siempre visible -->
+        <div class="footer-bottom-bar">
+            <div class="footer-bottom-text">
+                {{ FOOTER_TEXT }}
+            </div>
+        </div>
+    </footer>
+
+    <!-- Script de Integración API y Estado de Sesión -->
+    <script src="{% static 'js/api.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Registro de Pasajero - BusDrex{% endblock %}
+
+{% block content %}
+<div class="section-container" style="max-width: 580px; margin-top: 40px; margin-bottom: 60px;">
+    <div class="search-card" style="padding: 32px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+            <div class="logo-icon" style="margin: 0 auto 12px; width: 50px; height: 50px; font-size: 1.6rem;">B</div>
+            <h2 style="color: #00264d; font-size: 1.6rem; font-weight: 800;">Registro de Pasajero</h2>
+            <p style="color: #64748b; font-size: 0.9rem; margin-top: 4px;">Crea tu cuenta para comprar pasajes y acumular viajes</p>
+        </div>
+
+        <div id="registerErrorAlert" style="display: none; background: #fee2e2; border-left: 4px solid #e62629; color: #b91c1c; padding: 12px; border-radius: 4px; margin-bottom: 18px; font-size: 0.88rem;"></div>
+
+        <form onsubmit="handleRegisterSubmit(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label for="regNombre">Nombres</label>
+                    <input type="text" id="regNombre" class="form-control" placeholder="Ej. Juan" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="regApellido">Apellidos</label>
+                    <input type="text" id="regApellido" class="form-control" placeholder="Ej. Pérez" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                <div class="form-group">
+                    <label for="regRut">RUT / Identificación</label>
+                    <input type="text" id="regRut" class="form-control" placeholder="Ej. 19.876.543-2" required>
+                </div>
+                <div class="form-group">
+                    <label for="regTelefono">Teléfono Móvil</label>
+                    <input type="text" id="regTelefono" class="form-control" placeholder="Ej. +56912345678" required>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label for="regUsername">Nombre de Usuario</label>
+                <input type="text" id="regUsername" class="form-control" placeholder="Nombre de usuario para iniciar sesión" required>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label for="regEmail">Correo Electrónico</label>
+                <input type="email" id="regEmail" class="form-control" placeholder="tu-correo@ejemplo.cl" required>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px;">
+                <div class="form-group">
+                    <label for="regPassword">Contraseña</label>
+                    <input type="password" id="regPassword" class="form-control" placeholder="Mínimo 6 caracteres" required minlength="6">
+                </div>
+                <div class="form-group">
+                    <label for="regConfirmarPassword">Confirmar Contraseña</label>
+                    <input type="password" id="regConfirmarPassword" class="form-control" placeholder="Repite la contraseña" required minlength="6">
+                </div>
+            </div>
+
+            <button type="submit" id="btnRegisterSubmit" class="btn-search" style="width: 100%; justify-content: center; height: 48px;">
+                Crear Cuenta de Pasajero
+            </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid #f1f5f9; font-size: 0.9rem; color: #64748b;">
+            ¿Ya tienes una cuenta registrada?
+            <a href="/login/" style="color: #0066cc; font-weight: 700; text-decoration: none;">Inicia sesión aquí</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function handleRegisterSubmit(event) {
+        event.preventDefault();
+        const errorAlert = document.getElementById('registerErrorAlert');
+        const submitBtn = document.getElementById('btnRegisterSubmit');
+
+        const password = document.getElementById('regPassword').value;
+        const confirmarPassword = document.getElementById('regConfirmarPassword').value;
+
+        if (password !== confirmarPassword) {
+            errorAlert.textContent = 'Las contraseñas no coinciden. Por favor verifícalas.';
+            errorAlert.style.display = 'block';
+            return;
+        }
+
+        errorAlert.style.display = 'none';
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = 'Creando cuenta...';
+
+        const payload = {
+            username: document.getElementById('regUsername').value.trim(),
+            email: document.getElementById('regEmail').value.trim(),
+            first_name: document.getElementById('regNombre').value.trim(),
+            last_name: document.getElementById('regApellido').value.trim(),
+            rut: document.getElementById('regRut').value.trim(),
+            telefono: document.getElementById('regTelefono').value.trim(),
+            password: password,
+            confirmar_password: confirmarPassword
+        };
+
+        try {
+            const regRes = await fetch('/api/auth/register/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!regRes.ok) {
+                const errData = await regRes.json();
+                let errMsg = 'Errores en el registro: ';
+                for (const key in errData) {
+                    errMsg += `${key}: ${Array.isArray(errData[key]) ? errData[key].join(', ') : errData[key]} `;
+                }
+                throw new Error(errMsg);
+            }
+
+            // Auto-login automático tras registro
+            const loginRes = await fetch('/api/auth/login/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    username: payload.username,
+                    password: payload.password
+                })
+            });
+
+            if (loginRes.ok) {
+                const loginData = await loginRes.json();
+                BusdrexAPI.saveSession(loginData.access, loginData.refresh, loginData.usuario);
+                alert('¡Registro exitoso! Bienvenido a BusDrex.');
+                window.location.href = '/';
+            } else {
+                window.location.href = '/login/';
+            }
+
+        } catch (err) {
+            errorAlert.textContent = err.message;
+            errorAlert.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Crear Cuenta de Pasajero';
+        }
+    }
+</script>
+{% endblock %}

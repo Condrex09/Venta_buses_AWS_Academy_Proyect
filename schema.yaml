@@ -1,0 +1,4261 @@
+openapi: 3.0.3
+info:
+  title: BusDrex API - Gestión de Reservas de Pasajes de Buses Interurbanos
+  version: 1.0.0
+  description: |-
+    ## Plataforma de Gestión de Reservas de Pasajes Interurbanos
+    Inspirada en el portal y experiencia de usuario de **Turbus.cl**.
+
+    ---
+    ### Ficha Académica del Proyecto
+    - **Estudiante:** Benjamin Gómez
+    - **Asignatura:** Programación Back End
+    - **Evaluación:** Evaluación 2 (Django REST Framework + MySQL)
+    - **Sección:** AP-N4-C1
+    - **Año Lectivo:** 2026
+    ---
+
+    ### Matriz de Autenticación y Autorización
+    - **Público:** Consulta de rutas, itinerarios/servicios, asientos disponibles y ofertas.
+    - **Pasajero (`rol: PASAJERO`):** Gestión de su carro persistente, checkout atómico, pago, consulta de órdenes y boletos emitidos.
+    - **Administrador de Flota (`rol: ADMIN_FLOTA`):** CRUD de servicios, terminales, rutas, buses, asientos, ofertas, carros y actualización de estados de ventas.
+
+    **Pie de Página Institucional:** BusDrex © 2026 | Benjamin Gómez | Sección AP-N4-C1
+  contact:
+    name: Benjamin Gómez (AP-N4-C1)
+    email: benjamin.gomez@busdrex.cl
+  license:
+    name: Evaluación Académica 2 - Uso Académico 2026
+paths:
+  /api/admin/carros/:
+    get:
+      operationId: admin_carros_list
+      description: Permite al Administrador de Flota auditar todos los carros de compras
+        y vaciar o quitar ítems.
+      tags:
+      - Gestión de Carros (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CarroPasajes'
+          description: ''
+    delete:
+      operationId: admin_carros_destroy
+      description: Permite al Administrador de Flota auditar todos los carros de compras
+        y vaciar o quitar ítems.
+      tags:
+      - Gestión de Carros (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CarroPasajes'
+          description: ''
+  /api/admin/usuarios/:
+    get:
+      operationId: admin_usuarios_list
+      description: Permite al Administrador de Flota listar todos los usuarios del
+        sistema, consultar detalles específicos y activar o desactivar cuentas (campo
+        `is_active`).
+      parameters:
+      - in: query
+        name: is_active
+        schema:
+          type: boolean
+      - in: query
+        name: is_staff
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - in: query
+        name: rol
+        schema:
+          type: string
+          title: Rol en el Sistema
+          enum:
+          - ADMIN_FLOTA
+          - PASAJERO
+        description: |-
+          Define los privilegios de acceso (Pasajero o Administrador de Flota).
+
+          * `PASAJERO` - Pasajero
+          * `ADMIN_FLOTA` - Administrador de Flota
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      tags:
+      - Gestión de Usuarios (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedUsuarioGestionAdminList'
+          description: ''
+  /api/admin/usuarios/{id}/:
+    get:
+      operationId: admin_usuarios_retrieve
+      description: Permite al Administrador de Flota listar todos los usuarios del
+        sistema, consultar detalles específicos y activar o desactivar cuentas (campo
+        `is_active`).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Gestión de Usuarios (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioGestionAdmin'
+          description: ''
+    patch:
+      operationId: admin_usuarios_partial_update
+      description: Permite al Administrador de Flota listar todos los usuarios del
+        sistema, consultar detalles específicos y activar o desactivar cuentas (campo
+        `is_active`).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Gestión de Usuarios (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedUsuarioGestionAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedUsuarioGestionAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedUsuarioGestionAdminRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioGestionAdmin'
+          description: ''
+  /api/asientos/:
+    get:
+      operationId: asientos_list
+      description: |-
+        CRUD para gestión individual de asientos de servicios.
+        Permite al Administrador de Flota actualizar tipo o estado de un asiento específico.
+      parameters:
+      - in: query
+        name: estado
+        schema:
+          type: string
+          title: Estado de Disponibilidad
+          enum:
+          - DISPONIBLE
+          - OCUPADO
+        description: |-
+          * `DISPONIBLE` - Disponible
+          * `OCUPADO` - Ocupado
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      - in: query
+        name: servicio
+        schema:
+          type: integer
+      - in: query
+        name: tipo_asiento
+        schema:
+          type: string
+          title: Tipo de Asiento
+          enum:
+          - CAMA
+          - SEMICAMA
+        description: |-
+          Categoría de confort del asiento (Semicama o Salón Cama).
+
+          * `SEMICAMA` - Semicama
+          * `CAMA` - Salón Cama
+      tags:
+      - Gestión de Flota (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAsientoAdminList'
+          description: ''
+    post:
+      operationId: asientos_create
+      description: |-
+        CRUD para gestión individual de asientos de servicios.
+        Permite al Administrador de Flota actualizar tipo o estado de un asiento específico.
+      tags:
+      - Gestión de Flota (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsientoAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AsientoAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AsientoAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsientoAdmin'
+          description: ''
+  /api/asientos/{id}/:
+    get:
+      operationId: asientos_retrieve
+      description: |-
+        CRUD para gestión individual de asientos de servicios.
+        Permite al Administrador de Flota actualizar tipo o estado de un asiento específico.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Asiento.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsientoAdmin'
+          description: ''
+    put:
+      operationId: asientos_update
+      description: |-
+        CRUD para gestión individual de asientos de servicios.
+        Permite al Administrador de Flota actualizar tipo o estado de un asiento específico.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Asiento.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsientoAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AsientoAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AsientoAdminRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsientoAdmin'
+          description: ''
+    patch:
+      operationId: asientos_partial_update
+      description: |-
+        CRUD para gestión individual de asientos de servicios.
+        Permite al Administrador de Flota actualizar tipo o estado de un asiento específico.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Asiento.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAsientoAdminRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAsientoAdminRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAsientoAdminRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsientoAdmin'
+          description: ''
+    delete:
+      operationId: asientos_destroy
+      description: |-
+        CRUD para gestión individual de asientos de servicios.
+        Permite al Administrador de Flota actualizar tipo o estado de un asiento específico.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Asiento.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/auth/login/:
+    post:
+      operationId: auth_login_create
+      description: |-
+        Genera un par de tokens (Access y Refresh) firmados con JWT.
+        El payload del token incluye claims extendidos: `rol` (PASAJERO o ADMIN_FLOTA), `username`, `email` y `nombre_completo`.
+        Adicionalmente, abre una sesión estándar en Django para compatibilidad con vistas web y Swagger.
+      summary: Iniciar sesión y obtener tokens JWT con claims de rol
+      tags:
+      - Autenticación y Cuentas
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CustomTokenObtainPairRequest'
+        required: true
+      responses:
+        '200':
+          description: Tokens generados exitosamente y sesión iniciada.
+        '401':
+          description: Credenciales de acceso inválidas.
+  /api/auth/logout/:
+    post:
+      operationId: auth_logout_create
+      description: |-
+        Agrega el refresh token a la lista negra (Blacklist) impidiendo renovar accesos.
+        Cierra también la sesión de Django en el servidor.
+        IMPORTANTE: El carro de compras del usuario NO se elimina, persiste íntegro en MySQL.
+      summary: Cerrar sesión y revocar Refresh Token (Blacklist)
+      tags:
+      - Autenticación y Cuentas
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refresh:
+                  type: string
+                  description: Token de refresco a revocar
+              required:
+              - refresh
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: Sesión cerrada exitosamente y token revocado.
+        '400':
+          description: Token de refresco inválido o faltante.
+  /api/auth/perfil/:
+    get:
+      operationId: auth_perfil_retrieve
+      description: Retorna los datos del usuario actualmente autenticado mediante
+        el token Bearer JWT.
+      summary: Consultar perfil del usuario autenticado
+      tags:
+      - Autenticación y Cuentas
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioDetalle'
+          description: ''
+  /api/auth/refresh/:
+    post:
+      operationId: auth_refresh_create
+      description: |-
+        Takes a refresh type JSON web token and returns an access type JSON web
+        token if the refresh token is valid.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TokenRefreshRequest'
+        required: true
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenRefresh'
+          description: ''
+  /api/auth/register/:
+    post:
+      operationId: auth_register_create
+      description: |-
+        Permite el auto-registro público de clientes.
+        Por motivos de seguridad, todo registro público crea SIEMPRE un usuario con rol `PASAJERO`.
+        Cualquier intento de enviar `rol: ADMIN_FLOTA`, `is_staff` o `is_superuser` es ignorado.
+      summary: Registro de nuevo usuario pasajero
+      tags:
+      - Autenticación y Cuentas
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UsuarioRegistroRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UsuarioRegistroRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UsuarioRegistroRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsuarioDetalle'
+          description: ''
+        '400':
+          description: Errores de validación de datos o contraseñas no coincidentes.
+  /api/buses/:
+    get:
+      operationId: buses_list
+      description: CRUD para unidades de transporte de la flota BusDrex.
+      parameters:
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      - in: query
+        name: tipo_bus
+        schema:
+          type: string
+          title: Tipo / Categoría de Bus
+          enum:
+          - PREMIUM
+          - SALON_CAMA
+          - SEMICAMA
+        description: |-
+          * `SEMICAMA` - Semicama
+          * `SALON_CAMA` - Salón Cama
+          * `PREMIUM` - Premium / Cama Suite
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBusList'
+          description: ''
+    post:
+      operationId: buses_create
+      description: CRUD para unidades de transporte de la flota BusDrex.
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BusRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BusRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bus'
+          description: ''
+  /api/buses/{id}/:
+    get:
+      operationId: buses_retrieve
+      description: CRUD para unidades de transporte de la flota BusDrex.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Bus.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bus'
+          description: ''
+    put:
+      operationId: buses_update
+      description: CRUD para unidades de transporte de la flota BusDrex.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Bus.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BusRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/BusRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/BusRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bus'
+          description: ''
+    patch:
+      operationId: buses_partial_update
+      description: CRUD para unidades de transporte de la flota BusDrex.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Bus.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedBusRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedBusRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedBusRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bus'
+          description: ''
+    delete:
+      operationId: buses_destroy
+      description: CRUD para unidades de transporte de la flota BusDrex.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Bus.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/carro-pasajes/:
+    get:
+      operationId: carro_pasajes_retrieve
+      description: Obtiene todos los asientos guardados en el carro activo del usuario
+        con subtotales y total general.
+      summary: Consultar contenido del carro de pasajes persistente
+      tags:
+      - Carro de Pasajes (Pasajero)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CarroPasajes'
+          description: ''
+    post:
+      operationId: carro_pasajes_create
+      description: 'Agrega un asiento seleccionado con los datos nominativos del pasajero
+        (nombre y RUT). Normaliza el RUT y busca/crea la entidad Pasajero de forma
+        normalizada (3FN). Si el RUT ya existe, se reutiliza el Pasajero sin sobreescribir
+        su nombre. Regla de negocio: En este paso NO se descuenta el stock de asientos
+        en la base de datos.'
+      summary: Agregar pasaje al carro de compras
+      tags:
+      - Carro de Pasajes (Pasajero)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ItemCarroCreateRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ItemCarroCreateRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ItemCarroCreateRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ItemCarro'
+          description: ''
+        '400':
+          description: Asiento no disponible, zarpado o ya agregado al carro.
+    delete:
+      operationId: carro_pasajes_destroy
+      description: Si se provee el query parameter `?item_id=X`, elimina dicho ítem.
+        Sin parámetro, vacía todo el carro.
+      summary: Vaciar el carro o eliminar un ítem específico
+      parameters:
+      - in: query
+        name: item_id
+        schema:
+          type: integer
+        description: ID del ítem individual a eliminar (opcional)
+      tags:
+      - Carro de Pasajes (Pasajero)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Carro vaciado o ítem eliminado exitosamente.
+  /api/ciudades/:
+    get:
+      operationId: ciudades_list
+      description: CRUD para Ciudades por Región (3FN). Lectura pública, escritura
+        solo ADMIN_FLOTA.
+      parameters:
+      - in: query
+        name: nombre
+        schema:
+          type: string
+        description: Nombre de la Ciudad
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - in: query
+        name: region
+        schema:
+          type: number
+        description: ID de Región
+      - in: query
+        name: region_nombre
+        schema:
+          type: string
+        description: Nombre de la Región
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCiudadList'
+          description: ''
+    post:
+      operationId: ciudades_create
+      description: CRUD para Ciudades por Región (3FN). Lectura pública, escritura
+        solo ADMIN_FLOTA.
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CiudadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CiudadRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CiudadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ciudad'
+          description: ''
+  /api/ciudades/{id}/:
+    get:
+      operationId: ciudades_retrieve
+      description: CRUD para Ciudades por Región (3FN). Lectura pública, escritura
+        solo ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ciudad.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ciudad'
+          description: ''
+    put:
+      operationId: ciudades_update
+      description: CRUD para Ciudades por Región (3FN). Lectura pública, escritura
+        solo ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ciudad.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CiudadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CiudadRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CiudadRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ciudad'
+          description: ''
+    patch:
+      operationId: ciudades_partial_update
+      description: CRUD para Ciudades por Región (3FN). Lectura pública, escritura
+        solo ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ciudad.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCiudadRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCiudadRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCiudadRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ciudad'
+          description: ''
+    delete:
+      operationId: ciudades_destroy
+      description: CRUD para Ciudades por Región (3FN). Lectura pública, escritura
+        solo ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ciudad.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/info/:
+    get:
+      operationId: info_retrieve
+      description: Retorna los datos de identificación académica del estudiante (Nombre,
+        Sección, Año 2026).
+      summary: Consultar metadatos del estudiante y especificaciones del backend
+      tags:
+      - Metadatos de Evaluación
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          description: Metadatos de la evaluación académica y ficha del estudiante.
+  /api/mis-boletos/:
+    get:
+      operationId: mis_boletos_list
+      description: Retorna todos los boletos/tickets electrónicos adquiridos por el
+        usuario actual con filtro de estado.
+      summary: Consultar boletos emitidos del pasajero autenticado con filtros
+      parameters:
+      - in: query
+        name: codigo_boleto
+        schema:
+          type: string
+        description: Código UUID del Boleto
+      - in: query
+        name: estado
+        schema:
+          type: string
+          title: Estado del Boleto
+          enum:
+          - ANULADO
+          - VALIDO
+        description: |-
+          Estado del Boleto
+
+          * `VALIDO` - Válido
+          * `ANULADO` - Anulado
+      - in: query
+        name: nombre_pasajero
+        schema:
+          type: string
+        description: Nombre del Pasajero
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - in: query
+        name: rut_pasajero
+        schema:
+          type: string
+        description: RUT del Pasajero
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      tags:
+      - Boletos y Pasajes (Pasajero)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBoletoList'
+          description: ''
+  /api/mis-ordenes/:
+    get:
+      operationId: mis_ordenes_list
+      description: Retorna todas las órdenes generadas por el usuario autenticado
+        con filtros de estado y fechas.
+      summary: Consultar órdenes y compras del pasajero autenticado con filtros
+      parameters:
+      - in: query
+        name: estado
+        schema:
+          type: string
+          title: Estado de la Orden
+          enum:
+          - CANCELADO
+          - ENTREGADO
+          - PAGADO
+          - PENDIENTE
+        description: |-
+          Estado de la Venta
+
+          * `PENDIENTE` - Pendiente
+          * `PAGADO` - Pagado
+          * `CANCELADO` - Cancelado
+          * `ENTREGADO` - Entregado
+      - in: query
+        name: fecha_desde
+        schema:
+          type: string
+          format: date-time
+        description: Fecha Mínima de Creación
+      - in: query
+        name: fecha_hasta
+        schema:
+          type: string
+          format: date-time
+        description: Fecha Máxima de Creación
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      - in: query
+        name: usuario
+        schema:
+          type: number
+        description: ID del Usuario
+      - in: query
+        name: usuario_username
+        schema:
+          type: string
+        description: Nombre de Usuario
+      tags:
+      - Ventas y Checkout (Pasajero)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVentaList'
+          description: ''
+  /api/ofertas/:
+    get:
+      operationId: ofertas_list
+      description: |-
+        CRUD para ofertas y promociones interurbanas estilo Turbus.cl.
+        - Lectura (GET): Pública para alimentar el banner del Home.
+        - Escritura: Exclusiva para Administrador de Flota.
+      parameters:
+      - in: query
+        name: activa
+        schema:
+          type: boolean
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      tags:
+      - Ofertas y Promociones
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOfertaList'
+          description: ''
+    post:
+      operationId: ofertas_create
+      description: |-
+        CRUD para ofertas y promociones interurbanas estilo Turbus.cl.
+        - Lectura (GET): Pública para alimentar el banner del Home.
+        - Escritura: Exclusiva para Administrador de Flota.
+      tags:
+      - Ofertas y Promociones
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfertaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OfertaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OfertaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oferta'
+          description: ''
+  /api/ofertas/{id}/:
+    get:
+      operationId: ofertas_retrieve
+      description: |-
+        CRUD para ofertas y promociones interurbanas estilo Turbus.cl.
+        - Lectura (GET): Pública para alimentar el banner del Home.
+        - Escritura: Exclusiva para Administrador de Flota.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Oferta / Promoción.
+        required: true
+      tags:
+      - Ofertas y Promociones
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oferta'
+          description: ''
+    put:
+      operationId: ofertas_update
+      description: |-
+        CRUD para ofertas y promociones interurbanas estilo Turbus.cl.
+        - Lectura (GET): Pública para alimentar el banner del Home.
+        - Escritura: Exclusiva para Administrador de Flota.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Oferta / Promoción.
+        required: true
+      tags:
+      - Ofertas y Promociones
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OfertaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/OfertaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/OfertaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oferta'
+          description: ''
+    patch:
+      operationId: ofertas_partial_update
+      description: |-
+        CRUD para ofertas y promociones interurbanas estilo Turbus.cl.
+        - Lectura (GET): Pública para alimentar el banner del Home.
+        - Escritura: Exclusiva para Administrador de Flota.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Oferta / Promoción.
+        required: true
+      tags:
+      - Ofertas y Promociones
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedOfertaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedOfertaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedOfertaRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Oferta'
+          description: ''
+    delete:
+      operationId: ofertas_destroy
+      description: |-
+        CRUD para ofertas y promociones interurbanas estilo Turbus.cl.
+        - Lectura (GET): Pública para alimentar el banner del Home.
+        - Escritura: Exclusiva para Administrador de Flota.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Oferta / Promoción.
+        required: true
+      tags:
+      - Ofertas y Promociones
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/regiones/:
+    get:
+      operationId: regiones_list
+      description: CRUD para Regiones de Chile (3FN). Lectura pública, escritura solo
+        ADMIN_FLOTA.
+      parameters:
+      - in: query
+        name: nombre
+        schema:
+          type: string
+        description: Nombre de la Región
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRegionList'
+          description: ''
+    post:
+      operationId: regiones_create
+      description: CRUD para Regiones de Chile (3FN). Lectura pública, escritura solo
+        ADMIN_FLOTA.
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Region'
+          description: ''
+  /api/regiones/{id}/:
+    get:
+      operationId: regiones_retrieve
+      description: CRUD para Regiones de Chile (3FN). Lectura pública, escritura solo
+        ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Región.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Region'
+          description: ''
+    put:
+      operationId: regiones_update
+      description: CRUD para Regiones de Chile (3FN). Lectura pública, escritura solo
+        ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Región.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegionRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Region'
+          description: ''
+    patch:
+      operationId: regiones_partial_update
+      description: CRUD para Regiones de Chile (3FN). Lectura pública, escritura solo
+        ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Región.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRegionRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRegionRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRegionRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Region'
+          description: ''
+    delete:
+      operationId: regiones_destroy
+      description: CRUD para Regiones de Chile (3FN). Lectura pública, escritura solo
+        ADMIN_FLOTA.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Región.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/rutas/:
+    get:
+      operationId: rutas_list
+      description: CRUD para rutas y trayectos interurbanos con duración en minutos.
+      parameters:
+      - in: query
+        name: destino
+        schema:
+          type: number
+        description: ID Terminal de Destino
+      - in: query
+        name: destino_ciudad
+        schema:
+          type: string
+        description: Ciudad de Destino
+      - in: query
+        name: destino_ciudad_id
+        schema:
+          type: number
+        description: ID Ciudad de Destino
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - in: query
+        name: origen
+        schema:
+          type: number
+        description: ID Terminal de Origen
+      - in: query
+        name: origen_ciudad
+        schema:
+          type: string
+        description: Ciudad de Origen
+      - in: query
+        name: origen_ciudad_id
+        schema:
+          type: number
+        description: ID Ciudad de Origen
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRutaList'
+          description: ''
+    post:
+      operationId: rutas_create
+      description: CRUD para rutas y trayectos interurbanos con duración en minutos.
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RutaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RutaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RutaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruta'
+          description: ''
+  /api/rutas/{id}/:
+    get:
+      operationId: rutas_retrieve
+      description: CRUD para rutas y trayectos interurbanos con duración en minutos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ruta.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruta'
+          description: ''
+    put:
+      operationId: rutas_update
+      description: CRUD para rutas y trayectos interurbanos con duración en minutos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ruta.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RutaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RutaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RutaRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruta'
+          description: ''
+    patch:
+      operationId: rutas_partial_update
+      description: CRUD para rutas y trayectos interurbanos con duración en minutos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ruta.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRutaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRutaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRutaRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruta'
+          description: ''
+    delete:
+      operationId: rutas_destroy
+      description: CRUD para rutas y trayectos interurbanos con duración en minutos.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Ruta.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/servicios/:
+    get:
+      operationId: servicios_list
+      description: Permite al Administrador de Flota crear, modificar, consultar o
+        dar de baja servicios. Al crear un nuevo servicio, el sistema genera automáticamente
+        el inventario de asientos con distribución de Salón Cama y Semicama en estado
+        DISPONIBLE.
+      parameters:
+      - in: query
+        name: destino_ciudad
+        schema:
+          type: string
+        description: Ciudad de Destino
+      - in: query
+        name: destino_terminal
+        schema:
+          type: string
+        description: Terminal de Destino
+      - in: query
+        name: fecha_desde
+        schema:
+          type: string
+          format: date-time
+        description: Fecha y Hora de Salida Mínima
+      - in: query
+        name: fecha_hasta
+        schema:
+          type: string
+          format: date-time
+        description: Fecha y Hora de Salida Máxima
+      - in: query
+        name: fecha_salida
+        schema:
+          type: string
+          format: date
+        description: Fecha de Salida Exacta (YYYY-MM-DD)
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - in: query
+        name: origen_ciudad
+        schema:
+          type: string
+        description: Ciudad de Origen
+      - in: query
+        name: origen_terminal
+        schema:
+          type: string
+        description: Terminal de Origen
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      - in: query
+        name: solo_disponibles
+        schema:
+          type: boolean
+        description: Solo Servicios con Asientos Disponibles
+      - in: query
+        name: solo_futuros
+        schema:
+          type: boolean
+        description: Solo Servicios Futuros (no zarpados)
+      - in: query
+        name: tarifa_maxima
+        schema:
+          type: number
+        description: Tarifa Máxima (CLP)
+      - in: query
+        name: tarifa_minima
+        schema:
+          type: number
+        description: Tarifa Mínima (CLP)
+      - in: query
+        name: tipo_asiento
+        schema:
+          type: string
+        description: Tipo de Asiento Disponible (SEMICAMA o CAMA)
+      - in: query
+        name: tipo_bus
+        schema:
+          type: string
+          title: Tipo / Categoría de Bus
+          enum:
+          - PREMIUM
+          - SALON_CAMA
+          - SEMICAMA
+        description: |-
+          Tipo / Categoría de Bus
+
+          * `SEMICAMA` - Semicama
+          * `SALON_CAMA` - Salón Cama
+          * `PREMIUM` - Premium / Cama Suite
+      tags:
+      - Gestión de Flota (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServicioListList'
+          description: ''
+    post:
+      operationId: servicios_create
+      description: Permite al Administrador de Flota crear, modificar, consultar o
+        dar de baja servicios. Al crear un nuevo servicio, el sistema genera automáticamente
+        el inventario de asientos con distribución de Salón Cama y Semicama en estado
+        DISPONIBLE.
+      tags:
+      - Gestión de Flota (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicioWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ServicioWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ServicioWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicioWrite'
+          description: ''
+  /api/servicios/{id}/asientos/:
+    get:
+      operationId: servicios_asientos_retrieve
+      description: Retorna todos los asientos físicos del bus para el servicio especificado,
+        indicando número, tipo de asiento (SEMICAMA o CAMA), precio aplicable y estado
+        de ocupación (DISPONIBLE u OCUPADO).
+      summary: Consultar mapa, tipo de confort y disponibilidad de asientos de un
+        servicio
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID del Servicio
+        required: true
+      tags:
+      - Servicios e Itinerarios (Público)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Asiento'
+          description: Listado completo de asientos y resumen de disponibilidad.
+        '404':
+          description: Servicio no encontrado.
+  /api/servicios/{id}/:
+    get:
+      operationId: servicios_retrieve
+      description: Permite al Administrador de Flota crear, modificar, consultar o
+        dar de baja servicios. Al crear un nuevo servicio, el sistema genera automáticamente
+        el inventario de asientos con distribución de Salón Cama y Semicama en estado
+        DISPONIBLE.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Servicio / Itinerario.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicioList'
+          description: ''
+    put:
+      operationId: servicios_update
+      description: Permite al Administrador de Flota crear, modificar, consultar o
+        dar de baja servicios. Al crear un nuevo servicio, el sistema genera automáticamente
+        el inventario de asientos con distribución de Salón Cama y Semicama en estado
+        DISPONIBLE.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Servicio / Itinerario.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicioWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ServicioWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ServicioWriteRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicioWrite'
+          description: ''
+    patch:
+      operationId: servicios_partial_update
+      description: Permite al Administrador de Flota crear, modificar, consultar o
+        dar de baja servicios. Al crear un nuevo servicio, el sistema genera automáticamente
+        el inventario de asientos con distribución de Salón Cama y Semicama en estado
+        DISPONIBLE.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Servicio / Itinerario.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedServicioWriteRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedServicioWriteRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedServicioWriteRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicioWrite'
+          description: ''
+    delete:
+      operationId: servicios_destroy
+      description: Permite al Administrador de Flota crear, modificar, consultar o
+        dar de baja servicios. Al crear un nuevo servicio, el sistema genera automáticamente
+        el inventario de asientos con distribución de Salón Cama y Semicama en estado
+        DISPONIBLE.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Servicio / Itinerario.
+        required: true
+      tags:
+      - Gestión de Flota (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/servicios/buscar/:
+    get:
+      operationId: servicios_buscar_list
+      description: 'Permite a cualquier usuario consultar los servicios de viaje disponibles
+        estilo Turbus.cl. Soporta filtros por: ciudad de origen (`origen_ciudad`),
+        ciudad de destino (`destino_ciudad`), fecha de salida (`fecha_salida` formato
+        YYYY-MM-DD), tipo de bus (`tipo_bus`), tipo de asiento (`tipo_asiento`: SEMICAMA
+        o CAMA), rangos de tarifa, solo con disponibilidad y solo futuros.'
+      summary: Búsqueda pública de servicios e itinerarios con filtros avanzados
+      parameters:
+      - in: query
+        name: destino_ciudad
+        schema:
+          type: string
+        description: Ciudad de Destino
+      - in: query
+        name: destino_terminal
+        schema:
+          type: string
+        description: Terminal de Destino
+      - in: query
+        name: fecha_desde
+        schema:
+          type: string
+          format: date-time
+        description: Fecha y Hora de Salida Mínima
+      - in: query
+        name: fecha_hasta
+        schema:
+          type: string
+          format: date-time
+        description: Fecha y Hora de Salida Máxima
+      - in: query
+        name: fecha_salida
+        schema:
+          type: string
+          format: date
+        description: Fecha de Salida Exacta (YYYY-MM-DD)
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - in: query
+        name: origen_ciudad
+        schema:
+          type: string
+        description: Ciudad de Origen
+      - in: query
+        name: origen_terminal
+        schema:
+          type: string
+        description: Terminal de Origen
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      - in: query
+        name: solo_disponibles
+        schema:
+          type: boolean
+        description: Solo Servicios con Asientos Disponibles
+      - in: query
+        name: solo_futuros
+        schema:
+          type: boolean
+        description: Solo Servicios Futuros (no zarpados)
+      - in: query
+        name: tarifa_maxima
+        schema:
+          type: number
+        description: Tarifa Máxima (CLP)
+      - in: query
+        name: tarifa_minima
+        schema:
+          type: number
+        description: Tarifa Mínima (CLP)
+      - in: query
+        name: tipo_asiento
+        schema:
+          type: string
+        description: Tipo de Asiento Disponible (SEMICAMA o CAMA)
+      - in: query
+        name: tipo_bus
+        schema:
+          type: string
+          title: Tipo / Categoría de Bus
+          enum:
+          - PREMIUM
+          - SALON_CAMA
+          - SEMICAMA
+        description: |-
+          Tipo / Categoría de Bus
+
+          * `SEMICAMA` - Semicama
+          * `SALON_CAMA` - Salón Cama
+          * `PREMIUM` - Premium / Cama Suite
+      tags:
+      - Servicios e Itinerarios (Público)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedServicioListList'
+          description: ''
+  /api/terminales/:
+    get:
+      operationId: terminales_list
+      description: CRUD para terminales de buses. Recibe 'ciudad' (ID) y retorna 'ciudad_nombre'
+        y 'region_nombre'.
+      parameters:
+      - in: query
+        name: ciudad
+        schema:
+          type: number
+        description: ID de Ciudad
+      - in: query
+        name: ciudad_nombre
+        schema:
+          type: string
+        description: Nombre de Ciudad
+      - in: query
+        name: nombre
+        schema:
+          type: string
+        description: Nombre del Terminal
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - in: query
+        name: region
+        schema:
+          type: number
+        description: ID de Región
+      - in: query
+        name: region_nombre
+        schema:
+          type: string
+        description: Nombre de Región
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTerminalList'
+          description: ''
+    post:
+      operationId: terminales_create
+      description: CRUD para terminales de buses. Recibe 'ciudad' (ID) y retorna 'ciudad_nombre'
+        y 'region_nombre'.
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminalRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TerminalRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TerminalRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+  /api/terminales/{id}/:
+    get:
+      operationId: terminales_retrieve
+      description: CRUD para terminales de buses. Recibe 'ciudad' (ID) y retorna 'ciudad_nombre'
+        y 'region_nombre'.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Terminal.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+    put:
+      operationId: terminales_update
+      description: CRUD para terminales de buses. Recibe 'ciudad' (ID) y retorna 'ciudad_nombre'
+        y 'region_nombre'.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Terminal.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TerminalRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TerminalRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/TerminalRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+    patch:
+      operationId: terminales_partial_update
+      description: CRUD para terminales de buses. Recibe 'ciudad' (ID) y retorna 'ciudad_nombre'
+        y 'region_nombre'.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Terminal.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminalRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminalRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTerminalRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Terminal'
+          description: ''
+    delete:
+      operationId: terminales_destroy
+      description: CRUD para terminales de buses. Recibe 'ciudad' (ID) y retorna 'ciudad_nombre'
+        y 'region_nombre'.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: Un valor de entero único que identifique este Terminal.
+        required: true
+      tags:
+      - Catálogos de Geografía y Transporte
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/ventas/:
+    get:
+      operationId: ventas_list
+      description: Permite al Administrador de Flota auditar y filtrar todas las compras
+        del sistema.
+      summary: Listar todas las órdenes de venta del sistema con filtros avanzados
+      parameters:
+      - in: query
+        name: estado
+        schema:
+          type: string
+          title: Estado de la Orden
+          enum:
+          - CANCELADO
+          - ENTREGADO
+          - PAGADO
+          - PENDIENTE
+        description: |-
+          Estado de la Venta
+
+          * `PENDIENTE` - Pendiente
+          * `PAGADO` - Pagado
+          * `CANCELADO` - Cancelado
+          * `ENTREGADO` - Entregado
+      - in: query
+        name: fecha_desde
+        schema:
+          type: string
+          format: date-time
+        description: Fecha Mínima de Creación
+      - in: query
+        name: fecha_hasta
+        schema:
+          type: string
+          format: date-time
+        description: Fecha Máxima de Creación
+      - name: ordering
+        required: false
+        in: query
+        description: Qué campo usar para ordenar los resultados.
+        schema:
+          type: string
+      - name: page
+        required: false
+        in: query
+        description: Un número de página dentro del conjunto de resultados paginado.
+        schema:
+          type: integer
+      - name: search
+        required: false
+        in: query
+        description: Un término de búsqueda.
+        schema:
+          type: string
+      - in: query
+        name: usuario
+        schema:
+          type: number
+        description: ID del Usuario
+      - in: query
+        name: usuario_username
+        schema:
+          type: string
+        description: Nombre de Usuario
+      tags:
+      - Gestión de Ventas (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedVentaList'
+          description: ''
+  /api/ventas/{id}/cancelar/:
+    post:
+      operationId: ventas_cancelar_create
+      description: Permite al pasajero cancelar una orden que aún se encuentra en
+        estado PENDIENTE.
+      summary: Cancelar orden propia en estado PENDIENTE
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID de la Venta a cancelar
+        required: true
+      tags:
+      - Ventas y Checkout (Pasajero)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venta'
+          description: ''
+        '400':
+          description: Orden no cancelable por el pasajero.
+  /api/ventas/{id}/estado/:
+    patch:
+      operationId: ventas_estado_partial_update
+      description: |-
+        Permite al Administrador de Flota cambiar el estado de una venta.
+        Transiciones válidas: PENDIENTE->PAGADO, PENDIENTE->CANCELADO, PAGADO->ENTREGADO, PAGADO->CANCELADO.
+        Cualquier otra transición es rechazada con HTTP 400.
+      summary: Actualizar estado de una venta (Administrador de Flota)
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID de la Venta
+        required: true
+      tags:
+      - Gestión de Ventas (Administrador)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedActualizarEstadoVentaRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedActualizarEstadoVentaRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedActualizarEstadoVentaRequest'
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venta'
+          description: ''
+        '400':
+          description: Transición de estado inválida.
+        '404':
+          description: Venta no encontrada.
+  /api/ventas/{id}/pagar/:
+    post:
+      operationId: ventas_pagar_create
+      description: |-
+        Simula el pago de una orden en estado PENDIENTE.
+
+        **Lógica Transaccional:**
+        1. Bloqueo pesimista sobre las filas de los asientos en MySQL con `select_for_update()`.
+        2. Valida atómicamente que TODOS los asientos sigan en estado `DISPONIBLE` y bus no haya zarpado.
+        3. Si algún asiento está ocupado, se ejecuta Rollback completo y la orden se mantiene PENDIENTE (HTTP 400).
+        4. Si todos están disponibles: Asientos pasan a `OCUPADO`, Venta a `PAGADO` y se emiten los Boletos (3FN OneToOne con DetalleVenta).
+      summary: 'Pagar orden de venta: bloqueo pesimista select_for_update y emisión
+        de boletos'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        description: ID de la Venta a pagar
+        required: true
+      tags:
+      - Ventas y Checkout (Pasajero)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venta'
+          description: ''
+        '400':
+          description: Conflicto de disponibilidad o servicio zarpado.
+  /api/ventas/{id}/:
+    get:
+      operationId: ventas_retrieve
+      description: Permite al Administrador de Flota auditar y filtrar todas las compras
+        del sistema.
+      summary: Listar todas las órdenes de venta del sistema con filtros avanzados
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - Gestión de Ventas (Administrador)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venta'
+          description: ''
+  /api/ventas/checkout/:
+    post:
+      operationId: ventas_checkout_create
+      description: |-
+        Toma el contenido del carro del pasajero, crea la Venta en estado PENDIENTE con sus registros asociados de DetalleVenta (precios unitarios congelados e inmutables), y vacía el carro.
+        Regla crítica de negocio: Este paso NO descuenta stock ni marca asientos como ocupados.
+      summary: 'Ejecutar checkout: crea orden PENDIENTE y congela precios en DetalleVenta'
+      tags:
+      - Ventas y Checkout (Pasajero)
+      security:
+      - jwtAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Venta'
+          description: ''
+        '400':
+          description: Carro vacío o servicio zarpado.
+components:
+  schemas:
+    Asiento:
+      type: object
+      description: |-
+        Serializador para consultar y representar asientos físicos con su tipo de confort
+        (SEMICAMA o CAMA), disponibilidad y precio asociado al servicio.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        servicio_id:
+          type: integer
+          title: Servicio Asociado
+          readOnly: true
+        numero_asiento:
+          type: integer
+          readOnly: true
+          title: Número de Asiento
+          description: Número secuencial del asiento en el bus (ej. 1, 2, ..., 40).
+        tipo_asiento:
+          allOf:
+          - $ref: '#/components/schemas/TipoAsientoEnum'
+          title: Tipo de Asiento
+          description: |-
+            Categoría de confort del asiento (Semicama o Salón Cama).
+
+            * `SEMICAMA` - Semicama
+            * `CAMA` - Salón Cama
+        tipo_asiento_display:
+          type: string
+          readOnly: true
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoAsientoEnum'
+          title: Estado de Disponibilidad
+        estado_display:
+          type: string
+          readOnly: true
+        precio:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - estado_display
+      - id
+      - numero_asiento
+      - precio
+      - servicio_id
+      - tipo_asiento_display
+    AsientoAdmin:
+      type: object
+      description: Serializador para gestión administrativa directa de asientos (CRUD
+        admin).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        servicio:
+          type: integer
+          title: Servicio Asociado
+        numero_asiento:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Número de Asiento
+          description: Número secuencial del asiento en el bus (ej. 1, 2, ..., 40).
+        tipo_asiento:
+          allOf:
+          - $ref: '#/components/schemas/TipoAsientoEnum'
+          title: Tipo de Asiento
+          description: |-
+            Categoría de confort del asiento (Semicama o Salón Cama).
+
+            * `SEMICAMA` - Semicama
+            * `CAMA` - Salón Cama
+        tipo_asiento_display:
+          type: string
+          readOnly: true
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoAsientoEnum'
+          title: Estado de Disponibilidad
+        estado_display:
+          type: string
+          readOnly: true
+        precio:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+      required:
+      - estado_display
+      - id
+      - numero_asiento
+      - precio
+      - servicio
+      - tipo_asiento_display
+    AsientoAdminRequest:
+      type: object
+      description: Serializador para gestión administrativa directa de asientos (CRUD
+        admin).
+      properties:
+        servicio:
+          type: integer
+          title: Servicio Asociado
+        numero_asiento:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Número de Asiento
+          description: Número secuencial del asiento en el bus (ej. 1, 2, ..., 40).
+        tipo_asiento:
+          allOf:
+          - $ref: '#/components/schemas/TipoAsientoEnum'
+          title: Tipo de Asiento
+          description: |-
+            Categoría de confort del asiento (Semicama o Salón Cama).
+
+            * `SEMICAMA` - Semicama
+            * `CAMA` - Salón Cama
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoAsientoEnum'
+          title: Estado de Disponibilidad
+      required:
+      - numero_asiento
+      - servicio
+    Boleto:
+      type: object
+      description: |-
+        Serializador para boletos/tickets electrónicos emitidos en 3FN.
+        Obtiene sus atributos relacionales a través de 'detalle_venta'.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        codigo_boleto:
+          type: string
+          format: uuid
+          readOnly: true
+          title: Código de Boleto (UUID)
+        codigo_hash:
+          type: string
+          readOnly: true
+          title: Hash de Seguridad (SHA-256)
+          description: Hash criptográfico generado a partir de la transacción, asiento
+            y pasajero.
+        nombre_pasajero:
+          type: string
+          readOnly: true
+        rut_pasajero:
+          type: string
+          readOnly: true
+        numero_asiento:
+          type: integer
+          readOnly: true
+        tipo_asiento:
+          type: string
+          readOnly: true
+        tipo_asiento_display:
+          type: string
+          readOnly: true
+        servicio_id:
+          type: integer
+          readOnly: true
+        origen:
+          type: string
+          readOnly: true
+        destino:
+          type: string
+          readOnly: true
+        terminal_origen:
+          type: string
+          readOnly: true
+        terminal_destino:
+          type: string
+          readOnly: true
+        fecha_hora_salida:
+          type: string
+          format: date-time
+          readOnly: true
+        tipo_bus:
+          type: string
+          readOnly: true
+        patente_bus:
+          type: string
+          readOnly: true
+        precio_pagado:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoBoletoEnum'
+          title: Estado del Boleto
+        estado_display:
+          type: string
+          readOnly: true
+        fecha_emision:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Fecha y Hora de Emisión
+      required:
+      - codigo_boleto
+      - codigo_hash
+      - destino
+      - estado_display
+      - fecha_emision
+      - fecha_hora_salida
+      - id
+      - nombre_pasajero
+      - numero_asiento
+      - origen
+      - patente_bus
+      - precio_pagado
+      - rut_pasajero
+      - servicio_id
+      - terminal_destino
+      - terminal_origen
+      - tipo_asiento
+      - tipo_asiento_display
+      - tipo_bus
+    Bus:
+      type: object
+      description: Serializador para unidades de buses de la flota BusDrex.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        patente:
+          type: string
+          title: Patente / Placa Única
+          description: Formato oficial chileno (ej. ABCD-12 o AB-1234).
+          maxLength: 10
+        modelo:
+          type: string
+          title: Modelo del Vehículo
+          description: 'Ejemplo: Marcopolo Paradiso G8 1800 DD, Volvo B430R, Scania
+            K400.'
+          maxLength: 100
+        capacidad_total:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Capacidad Total de Pasajeros
+          description: Número total de asientos físicos en el bus.
+        tipo_bus:
+          allOf:
+          - $ref: '#/components/schemas/TipoBusEnum'
+          title: Tipo / Categoría de Bus
+        tipo_bus_display:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - modelo
+      - patente
+      - tipo_bus_display
+    BusRequest:
+      type: object
+      description: Serializador para unidades de buses de la flota BusDrex.
+      properties:
+        patente:
+          type: string
+          minLength: 1
+          title: Patente / Placa Única
+          description: Formato oficial chileno (ej. ABCD-12 o AB-1234).
+          maxLength: 10
+        modelo:
+          type: string
+          minLength: 1
+          title: Modelo del Vehículo
+          description: 'Ejemplo: Marcopolo Paradiso G8 1800 DD, Volvo B430R, Scania
+            K400.'
+          maxLength: 100
+        capacidad_total:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Capacidad Total de Pasajeros
+          description: Número total de asientos físicos en el bus.
+        tipo_bus:
+          allOf:
+          - $ref: '#/components/schemas/TipoBusEnum'
+          title: Tipo / Categoría de Bus
+      required:
+      - modelo
+      - patente
+    CarroPasajes:
+      type: object
+      description: |-
+        Serializador del carro de compras persistente.
+        Incluye todos los ítems agregados y el cálculo del monto total en tiempo real.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        usuario:
+          type: integer
+          readOnly: true
+          title: Usuario Titular
+        usuario_username:
+          type: string
+          readOnly: true
+        cantidad_items:
+          type: integer
+          readOnly: true
+        total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          readOnly: true
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ItemCarro'
+          readOnly: true
+        fecha_actualizacion:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Última Actualización
+      required:
+      - cantidad_items
+      - fecha_actualizacion
+      - id
+      - items
+      - total
+      - usuario
+      - usuario_username
+    Ciudad:
+      type: object
+      description: |-
+        Serializador para ciudades asociadas a regiones (3FN).
+        Permite lectura con 'region_nombre' y escritura con 'region' (ID).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          title: Nombre de la Ciudad
+          description: 'Ejemplo: Santiago, Concepción, Viña del Mar, Temuco.'
+          maxLength: 100
+        region:
+          type: integer
+          title: Región Perteneciente
+        region_nombre:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - nombre
+      - region
+      - region_nombre
+    CiudadRequest:
+      type: object
+      description: |-
+        Serializador para ciudades asociadas a regiones (3FN).
+        Permite lectura con 'region_nombre' y escritura con 'region' (ID).
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          title: Nombre de la Ciudad
+          description: 'Ejemplo: Santiago, Concepción, Viña del Mar, Temuco.'
+          maxLength: 100
+        region:
+          type: integer
+          title: Región Perteneciente
+      required:
+      - nombre
+      - region
+    CustomTokenObtainPairRequest:
+      type: object
+      description: |-
+        Serializador extendido de SimpleJWT para incluir Claims de Rol en el Token JWT.
+        Inyecta 'rol', 'username', 'email' y 'nombre_completo' en el payload firmado.
+        El claim 'rut' se retira cumpliendo la 3FN.
+      properties:
+        username:
+          type: string
+          writeOnly: true
+          minLength: 1
+        password:
+          type: string
+          writeOnly: true
+          minLength: 1
+      required:
+      - password
+      - username
+    DetalleVenta:
+      type: object
+      description: Serializador para los detalles inmutables de pasajes de una venta
+        (historial congelado).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        asiento_id:
+          type: integer
+          title: Asiento Asignado
+          readOnly: true
+        numero_asiento:
+          type: integer
+          readOnly: true
+        tipo_asiento:
+          type: string
+          readOnly: true
+        tipo_asiento_display:
+          type: string
+          readOnly: true
+        servicio_id:
+          type: integer
+          readOnly: true
+        origen:
+          type: string
+          readOnly: true
+        destino:
+          type: string
+          readOnly: true
+        fecha_hora_salida:
+          type: string
+          format: date-time
+          readOnly: true
+        pasajero_id:
+          type: integer
+          readOnly: true
+        nombre_pasajero:
+          type: string
+          readOnly: true
+        rut_pasajero:
+          type: string
+          readOnly: true
+        precio_unitario:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Precio Unitario Congelado (CLP)
+          description: Precio pactado inmutable capturado al momento del checkout.
+      required:
+      - asiento_id
+      - destino
+      - fecha_hora_salida
+      - id
+      - nombre_pasajero
+      - numero_asiento
+      - origen
+      - pasajero_id
+      - precio_unitario
+      - rut_pasajero
+      - servicio_id
+      - tipo_asiento
+      - tipo_asiento_display
+    EstadoAsientoEnum:
+      enum:
+      - DISPONIBLE
+      - OCUPADO
+      type: string
+      description: |-
+        * `DISPONIBLE` - Disponible
+        * `OCUPADO` - Ocupado
+    EstadoBoletoEnum:
+      enum:
+      - VALIDO
+      - ANULADO
+      type: string
+      description: |-
+        * `VALIDO` - Válido
+        * `ANULADO` - Anulado
+    EstadoVentaEnum:
+      enum:
+      - PENDIENTE
+      - PAGADO
+      - CANCELADO
+      - ENTREGADO
+      type: string
+      description: |-
+        * `PENDIENTE` - Pendiente
+        * `PAGADO` - Pagado
+        * `CANCELADO` - Cancelado
+        * `ENTREGADO` - Entregado
+    ItemCarro:
+      type: object
+      description: |-
+        Serializador de lectura para los ítems presentes en el carro de pasajes.
+        Expone detalles completos del servicio, bus, ruta y pasajero asignado.
+        Calcula el precio dinámicamente según tarifa y categoría de asiento.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        asiento_id:
+          type: integer
+          title: Asiento Seleccionado
+          readOnly: true
+        numero_asiento:
+          type: integer
+          readOnly: true
+        tipo_asiento:
+          type: string
+          readOnly: true
+        tipo_asiento_display:
+          type: string
+          readOnly: true
+        servicio_id:
+          type: integer
+          readOnly: true
+        origen:
+          type: string
+          readOnly: true
+        destino:
+          type: string
+          readOnly: true
+        fecha_hora_salida:
+          type: string
+          format: date-time
+          readOnly: true
+        tipo_bus:
+          type: string
+          readOnly: true
+        pasajero_id:
+          type: integer
+          readOnly: true
+        nombre_pasajero:
+          type: string
+          readOnly: true
+        rut_pasajero:
+          type: string
+          readOnly: true
+        precio:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        precio_unitario:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        fecha_agregado:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Fecha de Incorporación
+      required:
+      - asiento_id
+      - destino
+      - fecha_agregado
+      - fecha_hora_salida
+      - id
+      - nombre_pasajero
+      - numero_asiento
+      - origen
+      - pasajero_id
+      - precio
+      - precio_unitario
+      - rut_pasajero
+      - servicio_id
+      - tipo_asiento
+      - tipo_asiento_display
+      - tipo_bus
+    ItemCarroCreateRequest:
+      type: object
+      description: |-
+        Serializador para agregar un pasaje al carro de compras.
+        Requiere asiento_id y los datos nominativos del pasajero (nombre y RUT).
+        Valida disponibilidad preliminar y vigencia horaria sin descontar stock.
+      properties:
+        asiento_id:
+          type: integer
+          description: ID único del asiento físico a reservar.
+        nombre_pasajero:
+          type: string
+          minLength: 1
+          description: Nombre completo del pasajero que viajará.
+          maxLength: 150
+        rut_pasajero:
+          type: string
+          minLength: 1
+          description: RUT o documento de identidad del pasajero.
+          maxLength: 20
+      required:
+      - asiento_id
+      - nombre_pasajero
+      - rut_pasajero
+    Oferta:
+      type: object
+      description: Serializador para ofertas y promociones interurbanas (banners en
+        Turbus.cl).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        titulo:
+          type: string
+          title: Título de la Oferta
+          description: 'Ejemplo: ''Escápate a Viña del Mar con 25% de Descuento'''
+          maxLength: 150
+        descripcion:
+          type: string
+          nullable: true
+          title: Descripción de la Promoción
+          description: Detalles comerciales de la oferta y condiciones del viaje.
+        descuento_porcentaje:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: Descuento (%)
+          description: Porcentaje de descuento sobre la tarifa regular.
+        ruta:
+          type: integer
+          nullable: true
+          title: Ruta Asociada (Opcional)
+        ruta_display:
+          type: string
+          readOnly: true
+        fecha_inicio:
+          type: string
+          format: date
+          title: Fecha de Inicio de Vigencia
+        fecha_fin:
+          type: string
+          format: date
+          title: Fecha de Fin de Vigencia
+        activa:
+          type: boolean
+          title: ¿Oferta Activa?
+      required:
+      - fecha_fin
+      - fecha_inicio
+      - id
+      - ruta_display
+      - titulo
+    OfertaRequest:
+      type: object
+      description: Serializador para ofertas y promociones interurbanas (banners en
+        Turbus.cl).
+      properties:
+        titulo:
+          type: string
+          minLength: 1
+          title: Título de la Oferta
+          description: 'Ejemplo: ''Escápate a Viña del Mar con 25% de Descuento'''
+          maxLength: 150
+        descripcion:
+          type: string
+          nullable: true
+          title: Descripción de la Promoción
+          description: Detalles comerciales de la oferta y condiciones del viaje.
+        descuento_porcentaje:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: Descuento (%)
+          description: Porcentaje de descuento sobre la tarifa regular.
+        ruta:
+          type: integer
+          nullable: true
+          title: Ruta Asociada (Opcional)
+        fecha_inicio:
+          type: string
+          format: date
+          title: Fecha de Inicio de Vigencia
+        fecha_fin:
+          type: string
+          format: date
+          title: Fecha de Fin de Vigencia
+        activa:
+          type: boolean
+          title: ¿Oferta Activa?
+      required:
+      - fecha_fin
+      - fecha_inicio
+      - titulo
+    PaginatedAsientoAdminList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AsientoAdmin'
+    PaginatedBoletoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Boleto'
+    PaginatedBusList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Bus'
+    PaginatedCiudadList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ciudad'
+    PaginatedOfertaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Oferta'
+    PaginatedRegionList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Region'
+    PaginatedRutaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ruta'
+    PaginatedServicioListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServicioList'
+    PaginatedTerminalList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Terminal'
+    PaginatedUsuarioGestionAdminList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsuarioGestionAdmin'
+    PaginatedVentaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Venta'
+    PatchedActualizarEstadoVentaRequest:
+      type: object
+      description: |-
+        Serializador utilizado por el Administrador de Flota para modificar el estado de una venta.
+        Utiliza estrictamente la tupla de CHOICES definida en el modelo.
+      properties:
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoVentaEnum'
+          title: Estado de la Orden
+    PatchedAsientoAdminRequest:
+      type: object
+      description: Serializador para gestión administrativa directa de asientos (CRUD
+        admin).
+      properties:
+        servicio:
+          type: integer
+          title: Servicio Asociado
+        numero_asiento:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Número de Asiento
+          description: Número secuencial del asiento en el bus (ej. 1, 2, ..., 40).
+        tipo_asiento:
+          allOf:
+          - $ref: '#/components/schemas/TipoAsientoEnum'
+          title: Tipo de Asiento
+          description: |-
+            Categoría de confort del asiento (Semicama o Salón Cama).
+
+            * `SEMICAMA` - Semicama
+            * `CAMA` - Salón Cama
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoAsientoEnum'
+          title: Estado de Disponibilidad
+    PatchedBusRequest:
+      type: object
+      description: Serializador para unidades de buses de la flota BusDrex.
+      properties:
+        patente:
+          type: string
+          minLength: 1
+          title: Patente / Placa Única
+          description: Formato oficial chileno (ej. ABCD-12 o AB-1234).
+          maxLength: 10
+        modelo:
+          type: string
+          minLength: 1
+          title: Modelo del Vehículo
+          description: 'Ejemplo: Marcopolo Paradiso G8 1800 DD, Volvo B430R, Scania
+            K400.'
+          maxLength: 100
+        capacidad_total:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Capacidad Total de Pasajeros
+          description: Número total de asientos físicos en el bus.
+        tipo_bus:
+          allOf:
+          - $ref: '#/components/schemas/TipoBusEnum'
+          title: Tipo / Categoría de Bus
+    PatchedCiudadRequest:
+      type: object
+      description: |-
+        Serializador para ciudades asociadas a regiones (3FN).
+        Permite lectura con 'region_nombre' y escritura con 'region' (ID).
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          title: Nombre de la Ciudad
+          description: 'Ejemplo: Santiago, Concepción, Viña del Mar, Temuco.'
+          maxLength: 100
+        region:
+          type: integer
+          title: Región Perteneciente
+    PatchedOfertaRequest:
+      type: object
+      description: Serializador para ofertas y promociones interurbanas (banners en
+        Turbus.cl).
+      properties:
+        titulo:
+          type: string
+          minLength: 1
+          title: Título de la Oferta
+          description: 'Ejemplo: ''Escápate a Viña del Mar con 25% de Descuento'''
+          maxLength: 150
+        descripcion:
+          type: string
+          nullable: true
+          title: Descripción de la Promoción
+          description: Detalles comerciales de la oferta y condiciones del viaje.
+        descuento_porcentaje:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          title: Descuento (%)
+          description: Porcentaje de descuento sobre la tarifa regular.
+        ruta:
+          type: integer
+          nullable: true
+          title: Ruta Asociada (Opcional)
+        fecha_inicio:
+          type: string
+          format: date
+          title: Fecha de Inicio de Vigencia
+        fecha_fin:
+          type: string
+          format: date
+          title: Fecha de Fin de Vigencia
+        activa:
+          type: boolean
+          title: ¿Oferta Activa?
+    PatchedRegionRequest:
+      type: object
+      description: Serializador para regiones político-administrativas de Chile (3FN).
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          title: Nombre de la Región
+          description: 'Ejemplo: Región Metropolitana, Región del Biobío, Región de
+            Valparaíso.'
+          maxLength: 100
+    PatchedRutaRequest:
+      type: object
+      description: |-
+        Serializador para rutas entre terminales. Soporta lectura anidada y escritura por ID.
+        Almacena duración en minutos (duracion_minutos) según la 3FN del DBML.
+      properties:
+        origen_id:
+          type: integer
+          writeOnly: true
+        destino_id:
+          type: integer
+          writeOnly: true
+        duracion_minutos:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Duración del Viaje (Minutos)
+          description: Duración estimada en minutos (ej. 330 para 5 horas 30 min).
+    PatchedServicioWriteRequest:
+      type: object
+      description: |-
+        Serializador utilizado por el Administrador de Flota para crear y editar servicios.
+        Soporta asignación de tarifa_semicama y tarifa_cama, y genera asientos automáticamente.
+      properties:
+        ruta:
+          type: integer
+          title: Ruta del Itinerario
+        bus:
+          type: integer
+          title: Bus Asignado
+        fecha_hora_salida:
+          type: string
+          format: date-time
+          title: Fecha y Hora de Salida
+          description: Horario programado para el inicio del recorrido.
+        tarifa_semicama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Semicama (CLP)
+          description: Precio por asiento estándar Semicama para este viaje.
+        tarifa_cama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Salón Cama (CLP)
+          description: Precio por asiento Salón Cama para este viaje.
+    PatchedTerminalRequest:
+      type: object
+      description: |-
+        Serializador para terminales de buses.
+        Al escribir recibe 'ciudad' (ID). Al leer expone 'ciudad_nombre' y 'region_nombre'
+        para garantizar máxima compatibilidad con el frontend Turbus.
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          title: Nombre del Terminal
+          description: 'Ejemplo: Terminal San Borja, Terminal Collao, Terminal Rodoviario.'
+          maxLength: 150
+        ciudad:
+          type: integer
+          title: Ciudad de Ubicación
+    PatchedUsuarioGestionAdminRequest:
+      type: object
+      description: |-
+        Serializador para la administración de usuarios por parte del Administrador de Flota.
+        Permite listar usuarios y activar/desactivar cuentas (is_active).
+      properties:
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
+        telefono:
+          type: string
+          nullable: true
+          title: Teléfono de Contacto
+          description: Teléfono móvil para notificaciones de viaje (ej. +56912345678).
+          maxLength: 20
+        rol:
+          allOf:
+          - $ref: '#/components/schemas/RolEnum'
+          title: Rol en el Sistema
+          description: |-
+            Define los privilegios de acceso (Pasajero o Administrador de Flota).
+
+            * `PASAJERO` - Pasajero
+            * `ADMIN_FLOTA` - Administrador de Flota
+        is_active:
+          type: boolean
+          title: Activo
+          description: Indica si el usuario debe ser tratado como activo. Desmarque
+            esta opción en lugar de borrar la cuenta.
+    Region:
+      type: object
+      description: Serializador para regiones político-administrativas de Chile (3FN).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          title: Nombre de la Región
+          description: 'Ejemplo: Región Metropolitana, Región del Biobío, Región de
+            Valparaíso.'
+          maxLength: 100
+      required:
+      - id
+      - nombre
+    RegionRequest:
+      type: object
+      description: Serializador para regiones político-administrativas de Chile (3FN).
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          title: Nombre de la Región
+          description: 'Ejemplo: Región Metropolitana, Región del Biobío, Región de
+            Valparaíso.'
+          maxLength: 100
+      required:
+      - nombre
+    RolEnum:
+      enum:
+      - PASAJERO
+      - ADMIN_FLOTA
+      type: string
+      description: |-
+        * `PASAJERO` - Pasajero
+        * `ADMIN_FLOTA` - Administrador de Flota
+    Ruta:
+      type: object
+      description: |-
+        Serializador para rutas entre terminales. Soporta lectura anidada y escritura por ID.
+        Almacena duración en minutos (duracion_minutos) según la 3FN del DBML.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        origen:
+          allOf:
+          - $ref: '#/components/schemas/Terminal'
+          readOnly: true
+        destino:
+          allOf:
+          - $ref: '#/components/schemas/Terminal'
+          readOnly: true
+        duracion_minutos:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Duración del Viaje (Minutos)
+          description: Duración estimada en minutos (ej. 330 para 5 horas 30 min).
+        duracion_formateada:
+          type: string
+          readOnly: true
+      required:
+      - destino
+      - duracion_formateada
+      - id
+      - origen
+    RutaRequest:
+      type: object
+      description: |-
+        Serializador para rutas entre terminales. Soporta lectura anidada y escritura por ID.
+        Almacena duración en minutos (duracion_minutos) según la 3FN del DBML.
+      properties:
+        origen_id:
+          type: integer
+          writeOnly: true
+        destino_id:
+          type: integer
+          writeOnly: true
+        duracion_minutos:
+          type: integer
+          maximum: 4294967295
+          minimum: 0
+          format: int64
+          title: Duración del Viaje (Minutos)
+          description: Duración estimada en minutos (ej. 330 para 5 horas 30 min).
+      required:
+      - destino_id
+      - origen_id
+    ServicioList:
+      type: object
+      description: |-
+        Serializador optimizado para la consulta pública y búsqueda de servicios/itinerarios.
+        Incluye tarifas diferenciadas (Semicama y Salón Cama) y 'precio_desde'.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ruta:
+          allOf:
+          - $ref: '#/components/schemas/Ruta'
+          readOnly: true
+        bus:
+          allOf:
+          - $ref: '#/components/schemas/Bus'
+          readOnly: true
+        fecha_hora_salida:
+          type: string
+          format: date-time
+          title: Fecha y Hora de Salida
+          description: Horario programado para el inicio del recorrido.
+        tarifa_semicama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Semicama (CLP)
+          description: Precio por asiento estándar Semicama para este viaje.
+        tarifa_cama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Salón Cama (CLP)
+          description: Precio por asiento Salón Cama para este viaje.
+        precio_desde:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        asientos_disponibles:
+          type: integer
+          readOnly: true
+        capacidad_total:
+          type: integer
+          readOnly: true
+      required:
+      - asientos_disponibles
+      - bus
+      - capacidad_total
+      - fecha_hora_salida
+      - id
+      - precio_desde
+      - ruta
+    ServicioWrite:
+      type: object
+      description: |-
+        Serializador utilizado por el Administrador de Flota para crear y editar servicios.
+        Soporta asignación de tarifa_semicama y tarifa_cama, y genera asientos automáticamente.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        ruta:
+          type: integer
+          title: Ruta del Itinerario
+        bus:
+          type: integer
+          title: Bus Asignado
+        fecha_hora_salida:
+          type: string
+          format: date-time
+          title: Fecha y Hora de Salida
+          description: Horario programado para el inicio del recorrido.
+        tarifa_semicama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Semicama (CLP)
+          description: Precio por asiento estándar Semicama para este viaje.
+        tarifa_cama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Salón Cama (CLP)
+          description: Precio por asiento Salón Cama para este viaje.
+      required:
+      - bus
+      - fecha_hora_salida
+      - id
+      - ruta
+    ServicioWriteRequest:
+      type: object
+      description: |-
+        Serializador utilizado por el Administrador de Flota para crear y editar servicios.
+        Soporta asignación de tarifa_semicama y tarifa_cama, y genera asientos automáticamente.
+      properties:
+        ruta:
+          type: integer
+          title: Ruta del Itinerario
+        bus:
+          type: integer
+          title: Bus Asignado
+        fecha_hora_salida:
+          type: string
+          format: date-time
+          title: Fecha y Hora de Salida
+          description: Horario programado para el inicio del recorrido.
+        tarifa_semicama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Semicama (CLP)
+          description: Precio por asiento estándar Semicama para este viaje.
+        tarifa_cama:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          title: Tarifa Salón Cama (CLP)
+          description: Precio por asiento Salón Cama para este viaje.
+      required:
+      - bus
+      - fecha_hora_salida
+      - ruta
+    Terminal:
+      type: object
+      description: |-
+        Serializador para terminales de buses.
+        Al escribir recibe 'ciudad' (ID). Al leer expone 'ciudad_nombre' y 'region_nombre'
+        para garantizar máxima compatibilidad con el frontend Turbus.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        nombre:
+          type: string
+          title: Nombre del Terminal
+          description: 'Ejemplo: Terminal San Borja, Terminal Collao, Terminal Rodoviario.'
+          maxLength: 150
+        ciudad:
+          type: integer
+          title: Ciudad de Ubicación
+        ciudad_nombre:
+          type: string
+          readOnly: true
+        region_nombre:
+          type: string
+          readOnly: true
+      required:
+      - ciudad
+      - ciudad_nombre
+      - id
+      - nombre
+      - region_nombre
+    TerminalRequest:
+      type: object
+      description: |-
+        Serializador para terminales de buses.
+        Al escribir recibe 'ciudad' (ID). Al leer expone 'ciudad_nombre' y 'region_nombre'
+        para garantizar máxima compatibilidad con el frontend Turbus.
+      properties:
+        nombre:
+          type: string
+          minLength: 1
+          title: Nombre del Terminal
+          description: 'Ejemplo: Terminal San Borja, Terminal Collao, Terminal Rodoviario.'
+          maxLength: 150
+        ciudad:
+          type: integer
+          title: Ciudad de Ubicación
+      required:
+      - ciudad
+      - nombre
+    TipoAsientoEnum:
+      enum:
+      - SEMICAMA
+      - CAMA
+      type: string
+      description: |-
+        * `SEMICAMA` - Semicama
+        * `CAMA` - Salón Cama
+    TipoBusEnum:
+      enum:
+      - SEMICAMA
+      - SALON_CAMA
+      - PREMIUM
+      type: string
+      description: |-
+        * `SEMICAMA` - Semicama
+        * `SALON_CAMA` - Salón Cama
+        * `PREMIUM` - Premium / Cama Suite
+    TokenRefresh:
+      type: object
+      properties:
+        access:
+          type: string
+          readOnly: true
+        refresh:
+          type: string
+      required:
+      - access
+      - refresh
+    TokenRefreshRequest:
+      type: object
+      properties:
+        refresh:
+          type: string
+          minLength: 1
+      required:
+      - refresh
+    UsuarioDetalle:
+      type: object
+      description: Serializador para consultar el perfil del usuario autenticado.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          title: Nombre de usuario
+          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
+            dígitos y @/./+/-/_ '
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Dirección de correo electrónico
+        first_name:
+          type: string
+          readOnly: true
+          title: Nombre
+        last_name:
+          type: string
+          readOnly: true
+          title: Apellidos
+        telefono:
+          type: string
+          readOnly: true
+          nullable: true
+          title: Teléfono de Contacto
+          description: Teléfono móvil para notificaciones de viaje (ej. +56912345678).
+        rol:
+          allOf:
+          - $ref: '#/components/schemas/RolEnum'
+          readOnly: true
+          title: Rol en el Sistema
+          description: |-
+            Define los privilegios de acceso (Pasajero o Administrador de Flota).
+
+            * `PASAJERO` - Pasajero
+            * `ADMIN_FLOTA` - Administrador de Flota
+        rol_display:
+          type: string
+          readOnly: true
+        is_admin_flota:
+          type: boolean
+          description: |-
+            Determina si el usuario tiene rol de administrador de flota o superusuario.
+            Los administradores de Django y superusuarios heredan privilegios de flota.
+          readOnly: true
+        is_active:
+          type: boolean
+          readOnly: true
+          title: Activo
+          description: Indica si el usuario debe ser tratado como activo. Desmarque
+            esta opción en lugar de borrar la cuenta.
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Fecha de alta
+      required:
+      - date_joined
+      - email
+      - first_name
+      - id
+      - is_active
+      - is_admin_flota
+      - last_name
+      - rol
+      - rol_display
+      - telefono
+      - username
+    UsuarioGestionAdmin:
+      type: object
+      description: |-
+        Serializador para la administración de usuarios por parte del Administrador de Flota.
+        Permite listar usuarios y activar/desactivar cuentas (is_active).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          readOnly: true
+          title: Nombre de usuario
+          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
+            dígitos y @/./+/-/_ '
+        email:
+          type: string
+          format: email
+          readOnly: true
+          title: Dirección de correo electrónico
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
+        telefono:
+          type: string
+          nullable: true
+          title: Teléfono de Contacto
+          description: Teléfono móvil para notificaciones de viaje (ej. +56912345678).
+          maxLength: 20
+        rol:
+          allOf:
+          - $ref: '#/components/schemas/RolEnum'
+          title: Rol en el Sistema
+          description: |-
+            Define los privilegios de acceso (Pasajero o Administrador de Flota).
+
+            * `PASAJERO` - Pasajero
+            * `ADMIN_FLOTA` - Administrador de Flota
+        rol_display:
+          type: string
+          readOnly: true
+        is_active:
+          type: boolean
+          title: Activo
+          description: Indica si el usuario debe ser tratado como activo. Desmarque
+            esta opción en lugar de borrar la cuenta.
+        date_joined:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Fecha de alta
+      required:
+      - date_joined
+      - email
+      - id
+      - rol_display
+      - username
+    UsuarioRegistroRequest:
+      type: object
+      description: |-
+        Serializador para el auto-registro de nuevos usuarios en BusDrex.
+        REGLA DE SEGURIDAD CRÍTICA:
+        - Todo auto-registro genera SIEMPRE un usuario con rol 'PASAJERO'.
+        - El campo 'rol' es de solo lectura y cualquier valor enviado por el cliente es ignorado.
+        - Se eliminó el campo 'rut' para respetar la Tercera Forma Normal (3FN).
+        - Garantiza la creación inmediata del Carro de Pasajes (OneToOne) en la base de datos.
+      properties:
+        username:
+          type: string
+          minLength: 1
+          title: Nombre de usuario
+          description: 'Requerido. 150 carácteres como máximo. Únicamente letras,
+            dígitos y @/./+/-/_ '
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Dirección de correo electrónico
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        password:
+          type: string
+          writeOnly: true
+          minLength: 6
+          description: Contraseña mínima de 6 caracteres.
+        confirmar_password:
+          type: string
+          writeOnly: true
+          minLength: 6
+          description: Confirmación idéntica de la contraseña.
+        first_name:
+          type: string
+          title: Nombre
+          maxLength: 150
+        last_name:
+          type: string
+          title: Apellidos
+          maxLength: 150
+        telefono:
+          type: string
+          nullable: true
+          title: Teléfono de Contacto
+          description: Teléfono móvil para notificaciones de viaje (ej. +56912345678).
+          maxLength: 20
+      required:
+      - confirmar_password
+      - password
+      - username
+    Venta:
+      type: object
+      description: |-
+        Serializador maestro de la Venta / Orden de compra.
+        Contiene la lista anidada de detalles congelados y boletos emitidos.
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        codigo_transaccion:
+          type: string
+          format: uuid
+          readOnly: true
+          title: Código Único de Transacción (UUID)
+        usuario_username:
+          type: string
+          readOnly: true
+        total:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          title: Monto Total Congelado (CLP)
+          description: Snapshot del total liquidado al momento de realizar el checkout.
+        estado:
+          allOf:
+          - $ref: '#/components/schemas/EstadoVentaEnum'
+          title: Estado de la Orden
+        estado_display:
+          type: string
+          readOnly: true
+        fecha_creacion:
+          type: string
+          format: date-time
+          readOnly: true
+          title: Fecha de Transacción
+        detalles:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetalleVenta'
+          readOnly: true
+        boletos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Boleto'
+          readOnly: true
+      required:
+      - boletos
+      - codigo_transaccion
+      - detalles
+      - estado_display
+      - fecha_creacion
+      - id
+      - total
+      - usuario_username
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    jwtAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

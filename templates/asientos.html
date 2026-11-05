@@ -1,0 +1,264 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Selección de Asientos - BusDrex{% endblock %}
+
+{% block content %}
+<div class="bus-layout-container">
+    <!-- Diagrama Visual del Bus -->
+    <div class="bus-diagram-card">
+        <div id="serviceHeader" style="margin-bottom: 20px;">
+            <h2 id="serviceTitle" style="color: #00264d; font-size: 1.4rem; font-weight: 800;">Cargando itinerario...</h2>
+            <p id="serviceDetails" style="color: #64748b; font-size: 0.9rem; margin-top: 4px;"></p>
+        </div>
+
+        <!-- Leyenda de Asientos Estilo Turbus -->
+        <div class="bus-legend">
+            <div class="legend-item">
+                <div class="legend-box semicama"></div>
+                <span>Semicama Disponible</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box cama"></div>
+                <span>Salón Cama Disponible</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box seleccionado"></div>
+                <span>Seleccionado</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-box ocupado"></div>
+                <span>Ocupado</span>
+            </div>
+        </div>
+
+        <!-- Chasis del Bus -->
+        <div class="bus-frame">
+            <div class="bus-front-indicator">
+                🚌 Frente del Bus / Cabina Conductor
+            </div>
+
+            <!-- Piso 1: Salón Cama -->
+            <div class="floor-section-title">PISO 1 - SALÓN CAMA</div>
+            <div id="floor1Seats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; justify-items: center; margin-bottom: 20px;"></div>
+
+            <!-- Piso 2: Semicama -->
+            <div class="floor-section-title">PISO 2 - SEMICAMA</div>
+            <div id="floor2Seats" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; justify-items: center;"></div>
+        </div>
+    </div>
+
+    <!-- Panel Lateral: Formulario de Pasajeros y Resumen -->
+    <aside class="seat-selection-summary">
+        <h3 style="color: #00264d; font-size: 1.15rem; font-weight: 800; margin-bottom: 16px; border-bottom: 1.5px solid #f1f5f9; padding-bottom: 10px;">
+            Pasajes Seleccionados (<span id="selectedCountText">0</span>)
+        </h3>
+
+        <div id="noSelectionMessage" style="color: #94a3b8; font-size: 0.9rem; text-align: center; padding: 30px 10px;">
+            Haz clic en los asientos disponibles en el plano para seleccionarlos.
+        </div>
+
+        <form id="passengersForm" style="display: none;" onsubmit="handleAddToCart(event)">
+            <div id="passengerInputsContainer" style="display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; max-height: 420px; overflow-y: auto; padding-right: 4px;">
+                <!-- Se inyecta dinámicamente el formulario por asiento -->
+            </div>
+
+            <div style="background: #f8fafc; border-radius: 8px; padding: 14px; margin-bottom: 18px; border: 1px solid #e2e8f0;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #64748b; margin-bottom: 6px;">
+                    <span>Subtotal pasajes:</span>
+                    <span id="subtotalPrice">$0</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 1.25rem; font-weight: 800; color: #0066cc;">
+                    <span>Total:</span>
+                    <span id="totalPrice">$0</span>
+                </div>
+            </div>
+
+            <button type="submit" id="btnAddToCart" class="btn-search" style="width: 100%; justify-content: center;">
+                🛒 Agregar al Carro
+            </button>
+        </form>
+    </aside>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const servicioId = window.location.pathname.split('/').filter(Boolean).pop();
+    let servicioData = null;
+    let selectedSeatsMap = new Map(); // seatId -> { id, numero, tipo, precio }
+
+    async function loadSeats() {
+        try {
+            const res = await fetch(`/api/servicios/${servicioId}/asientos/`);
+            if (!res.ok) {
+                document.getElementById('serviceHeader').innerHTML = `
+                    <div style="color: #e62629; font-weight: 700;">Servicio no encontrado o no disponible.</div>
+                `;
+                return;
+            }
+
+            servicioData = await res.json();
+            renderServiceHeader();
+            renderSeatsGrid();
+        } catch (e) {
+            console.error('Error al cargar asientos:', e);
+        }
+    }
+
+    function renderServiceHeader() {
+        const fechaObj = new Date(servicioData.fecha_hora_salida);
+        const fechaStr = fechaObj.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const horaStr = fechaObj.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+        document.getElementById('serviceTitle').textContent = `${servicioData.origen} ➔ ${servicioData.destino}`;
+        document.getElementById('serviceDetails').textContent = `Salida: ${fechaStr} a las ${horaStr} hrs | Categoría: ${servicioData.tipo_bus} | Libres: ${servicioData.asientos_disponibles}`;
+    }
+
+    function renderSeatsGrid() {
+        const floor1 = document.getElementById('floor1Seats');
+        const floor2 = document.getElementById('floor2Seats');
+        floor1.innerHTML = '';
+        floor2.innerHTML = '';
+
+        servicioData.asientos.forEach(asiento => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = `seat-btn ${asiento.tipo_asiento.toLowerCase()} ${asiento.estado.toLowerCase()}`;
+            btn.id = `seatBtn_${asiento.id}`;
+            btn.innerHTML = `
+                <span>${asiento.numero_asiento}</span>
+                <span style="font-size: 0.6rem; opacity: 0.85;">${asiento.tipo_asiento === 'CAMA' ? 'Cama' : 'Semi'}</span>
+            `;
+
+            if (asiento.estado === 'DISPONIBLE') {
+                btn.onclick = () => toggleSeatSelection(asiento);
+            } else {
+                btn.disabled = true;
+                btn.title = `Asiento #${asiento.numero_asiento} Ocupado`;
+            }
+
+            // Piso 1: Salón Cama (primeros 12 asientos)
+            if (asiento.numero_asiento <= 12) {
+                floor1.appendChild(btn);
+            } else {
+                floor2.appendChild(btn);
+            }
+        });
+    }
+
+    function toggleSeatSelection(asiento) {
+        const btn = document.getElementById(`seatBtn_${asiento.id}`);
+        if (selectedSeatsMap.has(asiento.id)) {
+            selectedSeatsMap.delete(asiento.id);
+            btn.classList.remove('seleccionado');
+        } else {
+            selectedSeatsMap.set(asiento.id, {
+                id: asiento.id,
+                numero: asiento.numero_asiento,
+                tipo: asiento.tipo_asiento,
+                tipo_display: asiento.tipo_asiento_display,
+                precio: parseFloat(asiento.precio)
+            });
+            btn.classList.add('seleccionado');
+        }
+        updatePassengersForm();
+    }
+
+    function updatePassengersForm() {
+        const container = document.getElementById('passengerInputsContainer');
+        const form = document.getElementById('passengersForm');
+        const noMsg = document.getElementById('noSelectionMessage');
+        const countText = document.getElementById('selectedCountText');
+        const subtotal = document.getElementById('subtotalPrice');
+        const total = document.getElementById('totalPrice');
+
+        countText.textContent = selectedSeatsMap.size;
+
+        if (selectedSeatsMap.size === 0) {
+            form.style.display = 'none';
+            noMsg.style.display = 'block';
+            return;
+        }
+
+        form.style.display = 'block';
+        noMsg.style.display = 'none';
+
+        // Mantener valores ya digitados si es posible
+        const currentUser = BusdrexAPI.getUser();
+        let html = '';
+        let totalCalculado = 0;
+
+        selectedSeatsMap.forEach((seat, seatId) => {
+            totalCalculado += seat.precio;
+            const defName = currentUser?.nombre_completo || '';
+            const defRut = currentUser?.rut || '';
+
+            html += `
+                <div style="background: #f8fafc; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-weight: 800; color: #0066cc;">Asiento #${seat.numero} (${seat.tipo_display})</span>
+                        <span style="font-weight: 700; color: #1e293b;">$${seat.precio.toLocaleString('es-CL')}</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <input type="text" id="nombre_${seat.id}" class="form-control" placeholder="Nombre y Apellidos del pasajero" value="${defName}" required style="padding: 8px;">
+                        <input type="text" id="rut_${seat.id}" class="form-control" placeholder="RUT del pasajero (ej. 12.345.678-9)" value="${defRut}" required style="padding: 8px;">
+                    </div>
+                </div>
+            `;
+        });
+
+        container.innerHTML = html;
+        subtotal.textContent = `$${totalCalculado.toLocaleString('es-CL')}`;
+        total.textContent = `$${totalCalculado.toLocaleString('es-CL')}`;
+    }
+
+    async function handleAddToCart(event) {
+        event.preventDefault();
+
+        // Validar autenticación
+        if (!BusdrexAPI.getAccessToken()) {
+            alert('Debes iniciar sesión con tu cuenta de Pasajero para agregar pasajes al carro.');
+            window.location.href = `/login/?next=${encodeURIComponent(window.location.pathname)}`;
+            return;
+        }
+
+        const btn = document.getElementById('btnAddToCart');
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Agregando al carro...';
+
+        try {
+            // Agregar cada asiento seleccionado al carro persistente
+            for (const [seatId, seat] of selectedSeatsMap.entries()) {
+                const nombre = document.getElementById(`nombre_${seatId}`).value.trim();
+                const rut = document.getElementById(`rut_${seatId}`).value.trim();
+
+                const res = await BusdrexAPI.authFetch('/api/carro-pasajes/', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        asiento_id: seatId,
+                        nombre_pasajero: nombre,
+                        rut_pasajero: rut
+                    })
+                });
+
+                if (!res.ok) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || `Error al agregar el asiento #${seat.numero}`);
+                }
+            }
+
+            // Actualizar badge y redirigir al carro
+            await BusdrexAPI.updateCartCount();
+            window.location.href = '/carro/';
+
+        } catch (err) {
+            alert(`No fue posible agregar al carro: ${err.message}`);
+            btn.disabled = false;
+            btn.innerHTML = '🛒 Agregar al Carro';
+        }
+    }
+
+    loadSeats();
+</script>
+{% endblock %}
