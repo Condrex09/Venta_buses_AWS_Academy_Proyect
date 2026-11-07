@@ -66,12 +66,31 @@ SECRET_KEY = os.environ.get(
 # DEBUG leído de .env (por defecto False si no está definido en producción)
 DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-# ALLOWED_HOSTS leído de .env sin asterisco comodín inseguro por defecto
-ALLOWED_HOSTS = [
-    host.strip()
-    for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-    if host.strip()
-]
+# ALLOWED_HOSTS: Configuración para AWS EC2 (Paso 4 requiere permitirlos con '*' o por IP)
+ALLOWED_HOSTS_ENV = os.environ.get('ALLOWED_HOSTS', '*').strip()
+if ALLOWED_HOSTS_ENV == '*' or not ALLOWED_HOSTS_ENV:
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = [
+        host.strip()
+        for host in ALLOWED_HOSTS_ENV.split(',')
+        if host.strip()
+    ]
+
+# CSRF TRUSTED ORIGINS para peticiones seguras en AWS EC2 / Nginx
+CSRF_TRUSTED_ORIGINS_ENV = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if CSRF_TRUSTED_ORIGINS_ENV:
+    CSRF_TRUSTED_ORIGINS = [
+        origin.strip()
+        for origin in CSRF_TRUSTED_ORIGINS_ENV.split(',')
+        if origin.strip()
+    ]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost',
+        'http://127.0.0.1',
+        'http://*.compute.amazonaws.com',
+    ]
 
 # ==============================================================================
 # 3. APLICACIONES INSTALADAS
@@ -140,26 +159,37 @@ WSGI_APPLICATION = 'busdrex.wsgi.application'
 ASGI_APPLICATION = 'busdrex.asgi.application'
 
 # ==============================================================================
-# 6. BASE DE DATOS (CONFIGURACIÓN MYSQL CON MOTOR custom_mysql)
+# 6. BASE DE DATOS (SOPORTE DUAL: SQLite para AWS EC2 / MySQL con custom_mysql)
 # ==============================================================================
-# Requisito: Las credenciales se leen exclusivamente desde .env con python-dotenv.
-# Motor 'custom_mysql' para compatibilidad con versiones locales de MySQL.
-DATABASES = {
-    'default': {
-        'ENGINE': 'custom_mysql',
-        'NAME': os.environ.get('DB_NAME', 'busdrex_db'),
-        'USER': os.environ.get('DB_USER', 'root'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-        'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
-        'PORT': os.environ.get('DB_PORT', '3306'),
-        'CONN_MAX_AGE': 60,
-        'OPTIONS': {
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-            'charset': 'utf8mb4',
-            'connect_timeout': 5,
-        },
+# Requisito: Las credenciales se leen desde .env con python-dotenv.
+# Si DB_ENGINE es 'sqlite' (o si se despliega en EC2 sin MySQL): utiliza SQLite3.
+# Si DB_ENGINE es 'mysql' o 'custom_mysql': utiliza el motor custom_mysql.
+DB_ENGINE_CONFIG = os.environ.get('DB_ENGINE', 'sqlite').lower()
+
+if 'sqlite' in DB_ENGINE_CONFIG:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'custom_mysql',
+            'NAME': os.environ.get('DB_NAME', 'busdrex_db'),
+            'USER': os.environ.get('DB_USER', 'root'),
+            'PASSWORD': os.environ.get('DB_PASSWORD', ''),
+            'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
+            'PORT': os.environ.get('DB_PORT', '3306'),
+            'CONN_MAX_AGE': 60,
+            'OPTIONS': {
+                'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+                'charset': 'utf8mb4',
+                'connect_timeout': 5,
+            },
+        }
+    }
 
 # ==============================================================================
 # 7. MODELO DE USUARIO PERSONALIZADO (ROLES: PASAJERO Y ADMIN DE FLOTA)

@@ -7,6 +7,9 @@
 # Framework Web y ORM
 Django>=5.0,<7.0
 
+# Servidor de Producción WSGI (Para despliegue en Linux / AWS EC2)
+gunicorn>=21.2.0
+
 # Django REST Framework y Extensiones
 djangorestframework>=3.14.0
 djangorestframework-simplejwt>=5.3.0
